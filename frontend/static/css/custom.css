@@ -1,0 +1,154 @@
+body {
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    padding-top: 0 !important;
+}
+/* ============================================================
+   Шапка (общая для всех страниц)
+   ============================================================ */
+
+.app-header {
+    background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+    color: white;
+    padding: 16px 20px;
+    margin: 0 0 20px 0;
+    border-radius: 0;
+}
+
+.app-header h1 {
+    color: white;
+    font-size: 20px;
+}
+
+.app-header .btn-outline-light {
+    border-color: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.app-header .btn-outline-light:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Боковое меню */
+.offcanvas-body .btn {
+    display: block;
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 16px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    text-decoration: none;
+}
+
+.offcanvas-body .btn-outline-success {
+    color: #4CAF50;
+    border-color: #4CAF50;
+}
+
+.offcanvas-body .btn-outline-primary {
+    color: #2196F3;
+    border-color: #2196F3;
+}
+
+.offcanvas-body .btn-outline-secondary {
+    color: #757575;
+    border-color: #757575;
+}
+/* Карточки */
+.card-stats {
+    border: none;
+    border-radius: 16px;
+    transition: transform 0.2s ease;
+}
+
+.card-stats:hover {
+    transform: translateY(-2px);
+}
+
+.card-stats .icon {
+    font-size: 24px;
+}
+
+.card-stats .icon.small {
+    font-size: 18px;
+}
+
+.card-stats .value {
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+.card-stats .label {
+    font-size: 9px;
+}
+
+.card-stats .icon.small {
+    font-size: 14px;
+}
+
+/* Кнопка */
+#refreshBtn {
+    border-radius: 16px;
+    font-weight: 600;
+    font-size: 16px;
+    padding: 14px;
+}
+
+#refreshBtn.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+/* Карточки */
+.card {
+    border: none;
+    border-radius: 12px;
+}
+
+.card strong {
+    font-size: 16px;
+}
+
+/* Бейджи классов */
+.badge-standart { background: #4CAF50; color: #fff; }
+.badge-univ { background: #FFC107; color: #000; }
+.badge-confort { background: #2196F3; color: #fff; }
+.badge-prem { background: #9C27B0; color: #fff; }
+
+/* Строка заказа */
+.order-row { cursor: pointer; }
+.order-row:hover { background: #f8f9fa; }
+
+/* Детали заказа */
+.detail-block { background: #f8f9fa; border-radius: 8px; padding: 12px; margin-top: 4px; }
+
+/* Пагинация */
+.pagination { font-size: 14px; }
+
+/* Цвета */
+.card-green .value  { color: #4CAF50; }
+.card-blue .value   { color: #2196F3; }
+.card-orange .value { color: #FF9800; }
+.card-purple .value { color: #9C27B0; }
+.card-red .value    { color: #F44336; }
+.card-gray .value   { color: #757575; }
+
+/* Кнопка */
+#refreshBtn {
+    border-radius: 16px;
+    font-weight: 600;
+    font-size: 16px;
+    padding: 14px;
+}
+
+@media (max-width: 400px) {
+    .card-stats .value { font-size: 16px; }
+    .card-stats .icon  { font-size: 20px; }
+}
+
+.step-icon { font-size: 18px; width: 24px; text-align: center; }
+.step-done .step-icon { color: #4CAF50; }
+.step-active .step-icon { color: #2196F3; }

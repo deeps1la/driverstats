@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+</head>
+<body class="bg-light">
+<!-- ============================================= -->
+<!-- БОКОВОЕ МЕНЮ (Offcanvas) -->
+<!-- ============================================= -->
+<div class="offcanvas offcanvas-start" tabindex="-1" id="sidebarMenu">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title">Меню</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+        <a href="/" class="btn btn-outline-success w-100 mb-2">📊 Главная</a>
+        <a href="/orders" class="btn btn-outline-primary w-100">📋 Все заказы</a>
+        <a href="/reports" class="btn btn-outline-info w-100 mb-2">📊 Отчёты</a>
+        <a href="/settings" class="btn btn-outline-secondary w-100">⚙️ Настройки</a>
+    </div>
+</div>
+
+<div class="container py-3" style="max-width: 540px;">
+
+    <!-- ШАПКА -->
+    <div class="app-header d-flex align-items-center">
+        <button class="btn btn-outline-light me-3" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" title="Меню">
+            ☰
+        </button>
+        <h1 class="fw-bold mb-0">{{ app_name }}</h1>
+    </div>
+<div class="container py-3" style="max-width: 540px;">
+
+    <!-- ============================================= -->
+    <!-- БАЛАНС -->
+    <!-- ============================================= -->
+    <div class="text-center mb-4">
+        <div class="card shadow-sm">
+            <div class="card-body py-3">
+                <div class="text-muted small mb-1">Текущий баланс</div>
+                <div class="fw-bold fs-3" id="balance">-</div>
+            </div>
+        </div>
+    </div>
+
+        <!-- Шагомер -->
+        <div id="stepProgress" class="d-none mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body py-3">
+                    <div id="steps">
+                        <div class="d-flex align-items-center mb-2" id="step-auth">
+                            <span class="step-icon me-2">⏳</span>
+                            <span class="small">Авторизация...</span>
+                        </div>
+                        <div class="d-flex align-items-center mb-2" id="step-transactions">
+                            <span class="step-icon me-2">⚪</span>
+                            <span class="small text-muted">Загрузка транзакций...</span>
+                        </div>
+                        <div class="d-flex align-items-center mb-2" id="step-details">
+                            <span class="step-icon me-2">⚪</span>
+                            <span class="small text-muted">Детали заказов...</span>
+                        </div>
+                        <div class="d-flex align-items-center" id="step-done">
+                            <span class="step-icon me-2">⚪</span>
+                            <span class="small text-muted">Готово</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <!-- ============================================= -->
+    <!-- КНОПКА ОБНОВЛЕНИЯ -->
+    <!-- ============================================= -->
+    <button id="refreshBtn" class="btn btn-success btn-lg w-100 mb-2" onclick="loadStats()">
+        📊 ОБНОВИТЬ СТАТИСТИКУ
+    </button>
+
+    <div class="text-center text-muted small mb-4" id="lastUpdate">
+        Последнее обновление: -
+    </div>
+
+    <!-- Спиннер -->
+    <div id="loader" class="text-center d-none mb-4">
+        <div class="spinner-border text-success"></div>
+        <p class="text-muted mt-2">Загружаем данные...</p>
+    </div>
+    <!-- Ошибка -->
+    <div id="error" class="alert alert-danger d-none"></div>
+
+    <!-- КОНТЕНТ -->
+    <div id="content" class="d-none">
+
+        <!-- Заказы -->
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">✅ Заказы</span>
+                    <div>
+                        <strong id="orders">-</strong>
+                        <small id="ordersDiff" class="ms-2"></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Километраж -->
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">🛣️ Километраж</span>
+                    <div>
+                        <strong id="distance">-</strong>
+                        <small id="distanceDiff" class="ms-2"></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Касса брутто -->
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">💰 Касса брутто</span>
+                    <div>
+                        <strong id="income">-</strong>
+                        <small id="incomeDiff" class="ms-2"></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Комиссия -->
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">💸 Комиссия</span>
+                    <div>
+                        <strong id="commission">-</strong>
+                        <small id="commissionDiff" class="ms-2"></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- % Z -->
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">📊 % Z</span>
+                    <strong id="percentZ">0%</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- План -->
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">📋 План</span>
+                    <strong id="plan">0 MDL</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Заправка -->
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">⛽ Заправка</span>
+                    <strong id="fuel">0 MDL</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Чистый доход -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">📈 Чистый доход</span>
+                    <div>
+                        <strong id="netProfit">-</strong>
+                        <small id="netProfitDiff" class="ms-2"></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <p class="text-center text-muted small mt-4">{{ app_name }} v{{ app_version }} © deepCloud App</p>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
