@@ -17,12 +17,7 @@ class LetzAuth:
         self.app_version = LETZ_APP_VERSION
 
     def login(self) -> str | None:
-        """
-        Авторизация и получение SessionId.
-
-        Returns:
-            SessionId (str) или None при ошибке.
-        """
+        """Авторизация и получение SessionId."""
         try:
             response = requests.get(
                 f"{self.base_url}/login",
@@ -36,10 +31,8 @@ class LetzAuth:
                 timeout=30,
             )
             response.raise_for_status()
-
             data = response.json()
             status = data.get("Header", {}).get("Status")
-
             if status == 10:
                 session_id = data.get("SessionId")
                 print(f"[AUTH] ✅ Успешный вход")
@@ -48,7 +41,6 @@ class LetzAuth:
                 msg = data.get("Message", "Неизвестная ошибка")
                 print(f"[AUTH] ❌ Ошибка: {msg}")
                 return None
-
         except requests.RequestException as e:
             print(f"[AUTH] ❌ Сеть: {e}")
             return None
@@ -57,13 +49,7 @@ class LetzAuth:
             return None
 
     def get_driver_info(self) -> dict:
-        """
-        Получение полной информации о водителе из /login.
-        Включает CarName и CarNickname.
-
-        Returns:
-            Словарь с данными водителя.
-        """
+        """Получение информации о водителе."""
         try:
             response = requests.get(
                 f"{self.base_url}/login",
@@ -78,7 +64,6 @@ class LetzAuth:
             )
             response.raise_for_status()
             return response.json()
-
         except Exception as e:
             print(f"[AUTH] ❌ Ошибка получения данных: {e}")
             return {}

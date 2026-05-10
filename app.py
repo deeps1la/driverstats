@@ -9,22 +9,22 @@ APP_VERSION = "1.0"
 # Импорты
 # ----------------------------------------------------------
 
-from flask import Flask, render_template, jsonify, request        # Flask: сервер, HTML, JSON-ответы
-from config import SERVER_HOST, SERVER_PORT, SERVER_DEBUG  # Настройки из config.py
-from backend.auth import LetzAuth                          # Авторизация в Letz
-from backend.api_letz import LetzApi                       # Запросы к Letz API
-from backend.calculator import (                           # Расчёты
-    is_order,            # Проверка: это заказ или комиссия?
-    extract_distance,    # Достаёт расстояние из деталей заказа
-    extract_class,       # Достаёт класс авто (Стандарт/Комфорт/Премиум)
-    calculate_stats,     # Суммирует заказы, доход, комиссию
+from flask import Flask, render_template, jsonify, request
+from config import SERVER_HOST, SERVER_PORT, SERVER_DEBUG, LETZ_ACCESS_TOKEN, DATABASE_PATH
+from backend.auth import LetzAuth
+from backend.api_letz import LetzApi, TaxiDb
+from backend.calculator import (
+    is_order,
+    extract_distance,
+    extract_class,
+    calculate_stats,
 )
-from backend.database import Database                      # База данных SQLite
-from datetime import datetime                              # Для даты последнего обновления
-from config import LETZ_ACCESS_TOKEN
+from backend.database import Database
+from datetime import datetime
 import json
-from config import DATABASE_PATH
-
+import os
+import time
+import requests as req
 
 # ----------------------------------------------------------
 # Создание приложения
@@ -32,32 +32,35 @@ from config import DATABASE_PATH
 
 app = Flask(
     __name__,
-    template_folder="frontend/templates",   # Где лежат HTML-шаблоны
-    static_folder="frontend/static",        # Где лежат CSS и JS
+    template_folder="frontend/templates",
+    static_folder="frontend/static",
 )
 
-# Дата, с которой начинаем собирать заказы (игнорируем всё, что раньше)
-START_DATE = "2026-04-20"
-
-# Экземпляр базы данных (один на всё приложение)
+START_DATE = "2026-05-09"
 db = Database()
 
+
+def get_current_shift_id():
+    """Возвращает ID открытой смены или None."""
+    shift = db.get_current_shift()
+    return shift["id"] if shift else None
+
+
 # ----------------------------------------------------------
-# Маршруты
+# Главная
 # ----------------------------------------------------------
 
 @app.route("/")
 def index():
     return render_template("index.html", app_name=APP_NAME, app_version=APP_VERSION)
 
+
 @app.route("/api/balance")
 def api_balance():
-    """Возвращает текущий баланс через прямой запрос к Letz API."""
     auth = LetzAuth()
     session_id = auth.login()
     if not session_id:
         return jsonify({"balance": 0})
-    
     api = LetzApi(session_id)
     try:
         transactions_data = api.fetch_all_transactions()
@@ -66,79 +69,117 @@ def api_balance():
     except:
         return jsonify({"balance": 0})
 
+
+# ----------------------------------------------------------
+# Настройки
+# ----------------------------------------------------------
+
 @app.route("/settings")
 def settings_page():
-    """Страница настроек."""
     return render_template("settings.html")
-
 
 @app.route("/api/settings", methods=["GET", "POST"])
 def api_settings():
-    global START_DATE, APP_NAME, APP_VERSION, LETZ_ACCESS_TOKEN
-
+    import config
     if request.method == "GET":
         return jsonify({
             "start_date": START_DATE,
             "app_name": APP_NAME,
             "app_version": APP_VERSION,
-            "access_token": LETZ_ACCESS_TOKEN,
+            "access_token": config.LETZ_ACCESS_TOKEN,
+            "device_id": config.LETZ_DEVICE_ID,
         })
 
-    # POST
     data = request.get_json()
+    changed = False
+
     if "start_date" in data:
-        START_DATE = data["start_date"]
+        globals()["START_DATE"] = data["start_date"]
+        changed = True
     if "app_name" in data:
-        APP_NAME = data["app_name"]
+        globals()["APP_NAME"] = data["app_name"]
+        changed = True
     if "app_version" in data:
-        APP_VERSION = data["app_version"]
+        globals()["APP_VERSION"] = data["app_version"]
+        changed = True
     if "access_token" in data:
-        LETZ_ACCESS_TOKEN = data["access_token"]
-        auth = LetzAuth()
-        auth.access_token = LETZ_ACCESS_TOKEN
+        config.LETZ_ACCESS_TOKEN = data["access_token"]
+        changed = True
+    if "device_id" in data:
+        config.LETZ_DEVICE_ID = data["device_id"]
+        changed = True
+
+    if changed:
+        save_config(config)
 
     return jsonify({"ok": True})
 
-import os
-import time
-import requests as req
 
+def save_config(config_module):
+    """Сохраняет текущие настройки в config.py."""
+    config_path = os.path.join(os.path.dirname(__file__), "config.py")
+    with open(config_path, "w", encoding="utf-8") as f:
+        f.write(f'''"""
+Конфигурация приложения Letz Driver Stats.
+Все секретные ключи и настройки в одном месте.
+"""
+
+# ============================================================
+# API Letz
+# ============================================================
+
+LETZ_ACCESS_TOKEN = "{config_module.LETZ_ACCESS_TOKEN}"
+LETZ_DEVICE_ID = "{config_module.LETZ_DEVICE_ID}"
+LETZ_APP_VERSION = "{config_module.LETZ_APP_VERSION}"
+LETZ_BASE_URL = "{config_module.LETZ_BASE_URL}"
+
+# ============================================================
+# Сервер Flask
+# ============================================================
+
+SERVER_HOST = "{config_module.SERVER_HOST}"
+SERVER_PORT = {config_module.SERVER_PORT}
+SERVER_DEBUG = {config_module.SERVER_DEBUG}
+
+# ============================================================
+# База данных
+# ============================================================
+
+DATABASE_PATH = "{config_module.DATABASE_PATH}"
+
+# ============================================================
+# API-ключ для внешних приложений
+# ============================================================
+
+EXTERNAL_API_KEY = "{config_module.EXTERNAL_API_KEY}"
+
+# ============================================================
+# Z-отчёт
+# ============================================================
+
+Z_LIMIT = {config_module.Z_LIMIT}
+Z_PERCENT = {config_module.Z_PERCENT}
+''')
+    print("[CONFIG] ✅ Настройки сохранены в config.py")
 @app.route("/api/system-info")
 def api_system_info():
-    """Возвращает системную информацию."""
-    info = {
-        "letz_connected": False,
-        "letz_ping": 0,
-        "db_size": "0 KB",
-        "app_size": "0 KB",
-    }
-
-    # Проверка связи с Letz
+    info = {"letz_connected": False, "letz_ping": 0, "db_size": "0 KB", "app_size": "0 KB"}
     try:
         start = time.time()
         resp = req.get("http://letz99.from-md.com/ts.mobilerest/login", timeout=5)
         end = time.time()
-        info["letz_ping"] = round((end - start) * 1000, 1)  # мс
+        info["letz_ping"] = round((end - start) * 1000, 1)
         info["letz_connected"] = resp.status_code < 500
     except:
-        info["letz_connected"] = False
-        info["letz_ping"] = 0
-
-    # Размер БД
-    db_path = DATABASE_PATH
-    if os.path.exists(db_path):
-        size_bytes = os.path.getsize(db_path)
-        if size_bytes < 1024:
-            info["db_size"] = f"{size_bytes} B"
-        elif size_bytes < 1024 * 1024:
+        pass
+    if os.path.exists(DATABASE_PATH):
+        size_bytes = os.path.getsize(DATABASE_PATH)
+        if size_bytes < 1024 * 1024:
             info["db_size"] = f"{size_bytes / 1024:.1f} KB"
         else:
             info["db_size"] = f"{size_bytes / (1024 * 1024):.1f} MB"
-
-    # Размер приложения (текущая папка)
-    app_path = "."
     total_size = 0
-    for dirpath, dirnames, filenames in os.walk(app_path):
+    for dirpath, dirnames, filenames in os.walk("."):
         for f in filenames:
             fp = os.path.join(dirpath, f)
             if os.path.exists(fp):
@@ -147,40 +188,34 @@ def api_system_info():
         info["app_size"] = f"{total_size / 1024:.1f} KB"
     else:
         info["app_size"] = f"{total_size / (1024 * 1024):.1f} MB"
-
     return jsonify(info)
+
+
+# ----------------------------------------------------------
+# Заказы
+# ----------------------------------------------------------
 
 @app.route("/orders")
 def orders_page():
-    """Страница со списком всех заказов."""
     return render_template("orders.html")
 
 
 @app.route("/api/orders")
 def api_orders():
-    """API: отдаёт список всех заказов из БД."""
     orders = db.get_orders()
     return jsonify({"orders": orders})
 
+
 @app.route("/api/order/<int:order_id>")
 def api_order_detail(order_id):
-    """Возвращает детали одного заказа."""
     orders = db.get_orders()
     for o in orders:
         if o["id"] == order_id:
             detail = json.loads(o.get("details_json", "{}"))
-            
-            # Расшифровываем SettlementId и StreetId через taxi.db
-            from backend.api_letz import TaxiDb
             taxi = TaxiDb()
-            
             addr = detail.get("Order", {}).get("Address", {})
-            street_id = addr.get("StreetId", 0)
-            settlement_id = addr.get("SettlementId", 0)
-            
-            street_name = taxi.get_street_name(street_id)
-            settlement_name = taxi.get_settlement_name(settlement_id)
-            
+            street_name = taxi.get_street_name(addr.get("StreetId", 0))
+            settlement_name = taxi.get_settlement_name(addr.get("SettlementId", 0))
             return jsonify({
                 "id": o["id"],
                 "date": o["date"],
@@ -190,22 +225,22 @@ def api_order_detail(order_id):
                 "class_type": o["class_type"],
                 "payment_type": o["payment_type"],
                 "address": f"{settlement_name}, {street_name}, {addr.get('House', '')}",
-                "routes": detail.get("Order", {}).get("Routes", []),
             })
-    
     return jsonify({"error": "Заказ не найден"}), 404
+
+
+# ----------------------------------------------------------
+# Статистика
+# ----------------------------------------------------------
 
 @app.route("/api/stats")
 def api_stats():
     today = datetime.now().strftime("%Y-%m-%d")
-
     auth = LetzAuth()
     session_id = auth.login()
     if not session_id:
         return jsonify({"error": "Ошибка авторизации"}), 500
-
     api = LetzApi(session_id)
-
     try:
         transactions_data = api.fetch_all_transactions()
     except:
@@ -213,7 +248,6 @@ def api_stats():
 
     balance = transactions_data.get("CurrentBalance", 0)
 
-    # Сохраняем новые заказы в БД
     all_transactions = []
     for day in transactions_data.get("Data", []):
         day_str = day.get("Day", "")[:10]
@@ -223,29 +257,27 @@ def api_stats():
 
     all_transactions.sort(key=lambda x: x.get("Id", 0), reverse=True)
 
+    current_shift_id = get_current_shift_id()
     new_count = 0
     for tx in all_transactions:
         tx_date = tx.get("Time", tx.get("_day", ""))[:10]
         if tx_date < START_DATE:
             continue
-        if tx.get("Type") == 20:
+        if tx.get("Type") == 20 or tx.get("Type") == "Iesire":
             continue
         if not is_order(tx):
             continue
         if db.order_exists(tx["Id"]):
             continue
-
         try:
             detail = api.fetch_transaction_detail(tx["Id"])
             dist = extract_distance(detail)
-
             sync_id = tx.get("SyncOrderId", "")
             commission = 0.0
             for t in all_transactions:
                 if t.get("Type") == 20 and t.get("SyncOrderId") == sync_id:
                     commission = abs(t.get("Value", 0))
                     break
-
             db.save_order(
                 order_id=tx["Id"],
                 sync_id=sync_id,
@@ -256,22 +288,20 @@ def api_stats():
                 class_type=extract_class(detail),
                 payment_type=detail.get("Data", {}).get("TypeOfCash", ""),
                 details_json=json.dumps(detail),
+                shift_id=current_shift_id,
             )
             new_count += 1
             print(f"  ✅ Новый заказ #{tx['Id']}: {dist:.1f} км, {tx['Value']} MDL")
-
         except Exception as e:
             print(f"  ⚠️ Ошибка заказа #{tx['Id']}: {e}")
 
     print(f"🆕 Загружено новых заказов: {new_count}")
 
-    # Статистика за сегодня + сравнение
     all_days = {}
     for day in transactions_data.get("Data", []):
         day_str = day.get("Day", "")[:10]
         day_transactions = day.get("Transactions", [])
-        day_stats = calculate_stats(day_transactions)
-        all_days[day_str] = day_stats
+        all_days[day_str] = calculate_stats(day_transactions)
 
     today_stats = all_days.get(today, {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0})
     yesterday_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0}
@@ -290,81 +320,14 @@ def api_stats():
         "balance": balance,
         "last_update": datetime.now().strftime("%d.%m.%Y %H:%M"),
     })
-    """Статистика за сегодня + сравнение с предыдущим днём с заказами."""
-    today = datetime.now().strftime("%Y-%m-%d")
 
-    # Авторизация и получение данных из Letz
-    auth = LetzAuth()
-    session_id = auth.login()
-    if not session_id:
-        return jsonify({"error": "Ошибка авторизации"}), 500
 
-    api = LetzApi(session_id)
-
-    try:
-        transactions_data = api.fetch_all_transactions()
-    except:
-        return jsonify({"error": "Ошибка API"}), 500
-
-    balance = transactions_data.get("CurrentBalance", 0)
-
-    # Собираем статистику по всем дням из ответа Letz
-    all_days = {}
-    for day in transactions_data.get("Data", []):
-        day_str = day.get("Day", "")[:10]
-        day_transactions = day.get("Transactions", [])
-        day_stats = calculate_stats(day_transactions)
-
-        day_distance = 0.0
-        for tx in day_transactions:
-            if is_order(tx):
-                pass  # расстояние уже в БД
-
-        all_days[day_str] = {
-            "orders": day_stats["orders"],
-            "income": day_stats["income"],
-            "commission": day_stats["commission"],
-            "net_profit": day_stats["net_profit"],
-            "distance_km": 0,  # Заполним из БД
-        }
-
-    # Статистика за сегодня
-    today_stats = all_days.get(today, {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0})
-
-    # Ищем последний день с заказами ДО сегодня
-    yesterday_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0}
-    sorted_days = sorted([d for d in all_days.keys() if d < today], reverse=True)
-
-    for d in sorted_days:
-        if all_days[d]["orders"] > 0:
-            yesterday_stats = all_days[d]
-            break
-
-    # Километраж из БД
-    today_db = db.get_total_stats(from_date=today, to_date=today)
-    today_stats["distance_km"] = today_db["distance_km"]
-
-    # Ищем последний день с заказами для сравнения
-    last_active_day = today
-    sorted_days = sorted([d for d in all_days.keys() if d < today], reverse=True)
-    for d in sorted_days:
-        if all_days[d]["orders"] > 0:
-            last_active_day = d
-            break
-
-    yesterday_db = db.get_total_stats(from_date=last_active_day, to_date=last_active_day)
-    yesterday_stats["distance_km"] = yesterday_db.get("distance_km", 0)
-
-    return jsonify({
-        "today": today_stats,
-        "yesterday": yesterday_stats,
-        "balance": balance,
-        "last_update": datetime.now().strftime("%d.%m.%Y %H:%M"),
-    })
+# ----------------------------------------------------------
+# Отчёты
+# ----------------------------------------------------------
 
 @app.route("/reports")
 def reports_page():
-    """Страница отчётов."""
     return render_template("reports.html")
 
 
@@ -372,19 +335,15 @@ def reports_page():
 def api_report():
     from_date = request.args.get("from", "")
     to_date = request.args.get("to", "")
-    
     stats = db.get_total_stats(from_date=from_date, to_date=to_date)
     orders = db.get_orders(from_date=from_date, to_date=to_date)
-    
     class_counts = {}
     for o in orders:
         cls = o.get("class_type", "?")
         class_counts[cls] = class_counts.get(cls, 0) + 1
-    
     income = stats["income"]
     commission = stats["commission"]
     percent_z = round((commission / income) * 100, 1) if income > 0 else 0
-    
     return jsonify({
         "orders": stats["orders"],
         "distance": stats["distance_km"],
@@ -394,6 +353,129 @@ def api_report():
         "net_profit": stats["net_profit"],
         "class_counts": class_counts,
     })
+
+
+# ----------------------------------------------------------
+# Смены
+# ----------------------------------------------------------
+
+@app.route("/shift")
+def shift_page():
+    return render_template("shift.html")
+
+
+@app.route("/shifts")
+def shifts_page():
+    return render_template("shifts.html")
+
+
+@app.route("/shift/<int:shift_id>")
+def shift_detail_page(shift_id):
+    return render_template("shift_detail.html", shift_id=shift_id)
+
+
+@app.route("/api/shift", methods=["GET", "POST"])
+def api_shift():
+    if request.method == "GET":
+        shift = db.get_current_shift()
+        if shift:
+            shift["stats"] = db.get_shift_stats(shift["id"])
+            shift["open"] = True
+            return jsonify(shift)
+        return jsonify({"open": False})
+
+    data = request.get_json()
+    action = data.get("action", "")
+
+    if action == "open":
+        current = db.get_current_shift()
+        if current:
+            return jsonify({"error": "Уже есть открытая смена", "shift_id": current["id"]}), 409
+        shift_id = db.open_shift()
+        return jsonify({"ok": True, "shift_id": shift_id})
+
+    elif action == "close":
+        shift_id = data.get("shift_id")
+        if not shift_id:
+            return jsonify({"error": "Нет shift_id"}), 400
+        db.close_shift(
+            shift_id=shift_id,
+            plan_mdl=data.get("plan_mdl", 0),
+            z_report_mdl=data.get("z_report_mdl", 0),
+            fuel_lei=data.get("fuel_lei", 0),
+            total_km=data.get("total_km", 0),
+            notes=data.get("notes", ""),
+        )
+        return jsonify({"ok": True})
+
+    elif action == "update":
+        shift = db.get_current_shift()
+        if not shift:
+            return jsonify({"error": "Нет открытой смены"}), 404
+        db.update_shift_data(
+            shift_id=shift["id"],
+            plan_mdl=data.get("plan_mdl"),
+            z_report_mdl=data.get("z_report_mdl"),
+            fuel_lei=data.get("fuel_lei"),
+            total_km=data.get("total_km"),
+            notes=data.get("notes"),
+        )
+        return jsonify({"ok": True})
+
+    return jsonify({"error": "Неизвестное действие"}), 400
+
+
+@app.route("/api/shifts")
+def api_shifts():
+    shifts = db.get_shifts()
+    for s in shifts:
+        s["stats"] = db.get_shift_stats(s["id"])
+        if s["closed_at"] is None and s["total_km"] == 0:
+            s["total_km"] = s["stats"]["distance_km"]
+    return jsonify({"shifts": shifts})
+
+
+@app.route("/api/shift/<int:shift_id>")
+def api_shift_detail(shift_id):
+    shift = db.get_shift(shift_id)
+    if not shift:
+        return jsonify({"error": "Смена не найдена"}), 404
+
+    taxi = TaxiDb()
+    for o in shift.get("orders", []):
+        try:
+            detail = json.loads(o.get("details_json", "{}"))
+            addr = detail.get("Order", {}).get("Address", {})
+            street = taxi.get_street_name(addr.get("StreetId", 0))
+            settlement = taxi.get_settlement_name(addr.get("SettlementId", 0))
+            o["address"] = f"{settlement}, {street}, {addr.get('House', '')}"
+        except:
+            o["address"] = "—"
+
+    return jsonify(shift)
+    
+#-----------------------------------------------------------
+# Баланс QR
+#-----------------------------------------------------------
+
+@app.route("/api/qr-balance")
+def api_qr_balance():
+    """Возвращает Баланс QR из GetCarNicknameOverviewInfo."""
+    auth = LetzAuth()
+    session_id = auth.login()
+    if not session_id:
+        return jsonify({"qr_balance": "0"})
+    api = LetzApi(session_id)
+    try:
+        data = api.fetch_car_nickname_overview()
+        records = data.get("Info", {}).get("InfoRecords", [])
+        for r in records:
+            if r.get("Name") == "Баланс QR":
+                return jsonify({"qr_balance": r.get("Value", "0")})
+        return jsonify({"qr_balance": "0"})
+    except:
+        return jsonify({"qr_balance": "0"})
+
 
 # ----------------------------------------------------------
 # Запуск сервера

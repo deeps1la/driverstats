@@ -20,6 +20,8 @@
         <a href="/" class="btn btn-outline-success w-100 mb-2">📊 Главная</a>
         <a href="/orders" class="btn btn-outline-primary w-100">📋 Все заказы</a>
         <a href="/reports" class="btn btn-outline-info w-100 mb-2">📊 Отчёты</a>
+        <a href="/shift" class="btn btn-outline-warning w-100 mb-2">🕐 Смена</a>
+        <a href="/shifts" class="btn btn-outline-info w-100 mb-2">📋 Смены</a>
         <a href="/settings" class="btn btn-outline-secondary w-100">⚙️ Настройки</a>
     </div>
 </div>
@@ -41,37 +43,20 @@
     <div class="text-center mb-4">
         <div class="card shadow-sm">
             <div class="card-body py-3">
-                <div class="text-muted small mb-1">Текущий баланс</div>
-                <div class="fw-bold fs-3" id="balance">-</div>
-            </div>
-        </div>
-    </div>
-
-        <!-- Шагомер -->
-        <div id="stepProgress" class="d-none mb-3">
-            <div class="card shadow-sm">
-                <div class="card-body py-3">
-                    <div id="steps">
-                        <div class="d-flex align-items-center mb-2" id="step-auth">
-                            <span class="step-icon me-2">⏳</span>
-                            <span class="small">Авторизация...</span>
-                        </div>
-                        <div class="d-flex align-items-center mb-2" id="step-transactions">
-                            <span class="step-icon me-2">⚪</span>
-                            <span class="small text-muted">Загрузка транзакций...</span>
-                        </div>
-                        <div class="d-flex align-items-center mb-2" id="step-details">
-                            <span class="step-icon me-2">⚪</span>
-                            <span class="small text-muted">Детали заказов...</span>
-                        </div>
-                        <div class="d-flex align-items-center" id="step-done">
-                            <span class="step-icon me-2">⚪</span>
-                            <span class="small text-muted">Готово</span>
-                        </div>
+                <div class="row">
+                    <div class="col-6 border-end">
+                        <div class="text-muted small mb-1">Текущий баланс</div>
+                        <div class="fw-bold fs-3" id="balance">-</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-muted small mb-1">QR баланс</div>
+                        <div class="fw-bold fs-3" id="qrBalance">-</div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
+
     <!-- ============================================= -->
     <!-- КНОПКА ОБНОВЛЕНИЯ -->
     <!-- ============================================= -->

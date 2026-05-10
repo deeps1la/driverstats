@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Смена #{{ shift_id }} — Letz Driver Stats</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <style>
+        .badge-standart { background: #4CAF50; color: #fff; }
+        .badge-univ { background: #FFC107; color: #000; }
+        .badge-confort { background: #2196F3; color: #fff; }
+        .badge-prem { background: #9C27B0; color: #fff; }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="container py-3" style="max-width: 650px;">
+
+    <div class="app-header d-flex align-items-center mb-4">
+        <a href="/shifts" class="btn btn-outline-light me-3">← К сменам</a>
+        <h1 class="fw-bold mb-0 fs-4">🕐 Смена #{{ shift_id }}</h1>
+    </div>
+
+    <div id="loader" class="text-center d-none mb-4">
+        <div class="spinner-border text-success"></div>
+    </div>
+
+    <div id="error" class="alert alert-danger d-none"></div>
+
+    <div id="content" class="d-none">
+
+        <!-- Инфо -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">Открыта:</span>
+                    <strong id="s-opened">-</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">Закрыта:</span>
+                    <strong id="s-closed">-</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Метрики -->
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span class="text-muted small">📋 План</span><strong id="s-plan">0 MDL</strong></div>
+            </div>
+        </div>
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span class="text-muted small">✅ Заказов</span><strong id="s-orders">0</strong></div>
+            </div>
+        </div>
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span class="text-muted small">💰 Доход (из заказов)</span><strong id="s-income">0 MDL</strong></div>
+            </div>
+        </div>
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span class="text-muted small">💸 Комиссия</span><strong id="s-commission" class="text-danger">0 MDL</strong></div>
+            </div>
+        </div>
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span class="text-muted small">🧾 Z-отчёт</span><strong id="s-zreport">0 MDL</strong></div>
+            </div>
+        </div>
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span class="text-muted small">💸 % с Z-отчёта (12% свыше 1500)</span><strong id="s-zpercent" class="text-danger">0 MDL</strong></div>
+            </div>
+        </div>
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span class="text-muted small">⛽ Топливо</span><strong id="s-fuel">0 MDL</strong></div>
+            </div>
+        </div>
+        <div class="card shadow-sm mb-3">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span class="text-muted small">📈 Чистый доход</span><strong id="s-net" class="text-success">0 MDL</strong></div>
+            </div>
+        </div>
+
+        <!-- Заметки -->
+        <div id="s-notes-block" class="card shadow-sm mb-3 d-none">
+            <div class="card-body py-2">
+                <span class="text-muted small">📝 Заметки:</span>
+                <p id="s-notes" class="mb-0 mt-1"></p>
+            </div>
+        </div>
+
+        <!-- Список заказов -->
+        <h5 class="mb-2">📋 Заказы смены</h5>
+        <div id="s-orders-list"></div>
+    </div>
+
+</div>
+
+<script>
+    const CLASS_COLORS = {
+        'STD': 'badge-standart',
+        'UNIV': 'badge-univ',
+        'CONF': 'badge-confort',
+        'PREM': 'badge-prem'
+    };
+
+    const shiftId = {{ shift_id }};
+
+    async function loadShiftDetail() {
+        const loader = document.getElementById('loader');
+        const error = document.getElementById('error');
+        const content = document.getElementById('content');
+        loader.classList.remove('d-none');
+        error.classList.add('d-none');
+
+        try {
+            const resp = await fetch('/api/shift/' + shiftId);
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error);
+
+            document.getElementById('s-opened').textContent = data.opened_at?.replace('T', ' ').slice(0, 16) || '-';
+            document.getElementById('s-closed').textContent = data.closed_at ? data.closed_at.replace('T', ' ').slice(0, 16) : '🟢 Открыта';
+            document.getElementById('s-plan').textContent = (data.plan_mdl || 0).toFixed(2) + ' MDL';
+
+            const st = data.stats || {};
+            document.getElementById('s-orders').textContent = st.orders || 0;
+            document.getElementById('s-income').textContent = (st.income || 0).toFixed(2) + ' MDL';
+            document.getElementById('s-commission').textContent = '-' + (st.commission || 0).toFixed(2) + ' MDL';
+            document.getElementById('s-zreport').textContent = (data.z_report_mdl || 0).toFixed(2) + ' MDL';
+            document.getElementById('s-zpercent').textContent = (data.z_percent || 0).toFixed(2) + ' MDL';
+            document.getElementById('s-fuel').textContent = (data.fuel_lei || 0).toFixed(2) + ' MDL';
+            document.getElementById('s-net').textContent = (data.net_after_z || 0).toFixed(2) + ' MDL';
+
+            if (data.notes) {
+                document.getElementById('s-notes-block').classList.remove('d-none');
+                document.getElementById('s-notes').textContent = data.notes;
+            }
+
+            let ordersHtml = '';
+            for (const o of data.orders || []) {
+                const d = new Date(o.date);
+                const dateStr = d.toLocaleDateString('ru-RU');
+                const classBadge = CLASS_COLORS[o.class_type] || 'badge-secondary';
+                ordersHtml += `
+                <div class="card shadow-sm mb-1">
+                    <div class="card-body py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge ${classBadge}">${o.class_type || '?'}</span>
+                                <small>${dateStr}</small>
+                            </div>
+                            <div class="text-end">
+                                <strong>${(o.amount || 0).toFixed(2)} MDL</strong>
+                                <div class="small text-muted">${(o.distance_km || 0).toFixed(1)} км · ${o.address || '—'}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            document.getElementById('s-orders-list').innerHTML = ordersHtml || '<div class="text-muted small">Нет заказов</div>';
+            content.classList.remove('d-none');
+        } catch (e) {
+            error.textContent = '❌ ' + e.message;
+            error.classList.remove('d-none');
+        } finally {
+            loader.classList.add('d-none');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadShiftDetail);
+</script>
+</body>
+</html>

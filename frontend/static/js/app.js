@@ -17,28 +17,12 @@ async function loadStats() {
     const error = document.getElementById('error');
     const content = document.getElementById('content');
     const lastUpdate = document.getElementById('lastUpdate');
-    const stepProgress = document.getElementById('stepProgress');
 
     btn.classList.add('loading');
     btn.textContent = '⏳ Загрузка...';
     loader.classList.remove('d-none');
     error.classList.add('d-none');
     content.classList.add('d-none');
-
-    // Показываем шагомер
-    stepProgress.classList.remove('d-none');
-
-    // Сброс шагов
-    document.querySelectorAll('#steps > div').forEach(el => {
-        el.querySelector('.step-icon').textContent = '⚪';
-        el.querySelector('.step-icon').classList.remove('text-success', 'text-primary');
-        el.querySelector('span:last-child').classList.add('text-muted');
-    });
-
-    // Шаг 1: Авторизация
-    const stepAuth = document.getElementById('step-auth');
-    stepAuth.querySelector('.step-icon').textContent = '⏳';
-    stepAuth.querySelector('span:last-child').classList.remove('text-muted');
 
     try {
         const response = await fetch('/api/stats');
@@ -50,30 +34,6 @@ async function loadStats() {
         const t = data.today;
         const y = data.yesterday;
 
-        // Шаг 1: Авторизация завершена
-        stepAuth.querySelector('.step-icon').textContent = '✅';
-        stepAuth.querySelector('.step-icon').classList.add('text-success');
-        stepAuth.querySelector('span:last-child').classList.add('text-muted');
-
-        // Шаг 2: Транзакции загружены
-        const stepTransactions = document.getElementById('step-transactions');
-        stepTransactions.querySelector('.step-icon').textContent = '✅';
-        stepTransactions.querySelector('.step-icon').classList.add('text-success');
-        stepTransactions.querySelector('span:last-child').classList.remove('text-muted');
-
-        // Шаг 3: Детали
-        const stepDetails = document.getElementById('step-details');
-        stepDetails.querySelector('.step-icon').textContent = '✅';
-        stepDetails.querySelector('.step-icon').classList.add('text-success');
-        stepDetails.querySelector('span:last-child').classList.remove('text-muted');
-
-        // Шаг 4: Готово
-        const stepDone = document.getElementById('step-done');
-        stepDone.querySelector('.step-icon').textContent = '✅';
-        stepDone.querySelector('.step-icon').classList.add('text-success');
-        stepDone.querySelector('span:last-child').classList.remove('text-muted');
-
-        // Функция сравнения
         function compare(id, todayVal, yesterdayVal, unit) {
             document.getElementById(id).textContent = todayVal + ' ' + unit;
             const diffEl = document.getElementById(id + 'Diff');
@@ -105,13 +65,21 @@ async function loadStats() {
         btn.classList.remove('loading');
         btn.textContent = '📊 ОБНОВИТЬ СТАТИСТИКУ';
         loader.classList.add('d-none');
-        setTimeout(() => {
-            stepProgress.classList.add('d-none');
-        }, 1500);
+    }
+}
+
+async function loadQrBalance() {
+    try {
+        const resp = await fetch('/api/qr-balance');
+        const data = await resp.json();
+        document.getElementById('qrBalance').textContent = (data.qr_balance || '0') + ' MDL';
+    } catch (e) {
+        console.error('Ошибка QR-баланса:', e);
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     loadBalance();
+    loadQrBalance();
     loadStats();
 });

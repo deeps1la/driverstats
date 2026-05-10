@@ -154,6 +154,16 @@ class LetzApi:
             timeout=30,
         )
         return response.json()
+    # Баланс QR
+    def fetch_car_nickname_overview(self) -> dict:
+        """Запрашивает обзорную информацию: баланс QR, заказы за сутки и др."""
+        response = requests.get(
+            f"{self.base_url}/GetCarNicknameOverviewInfo",
+            params={"sessionId": self.session_id},
+            headers=self.headers,
+            timeout=30,
+        )
+        return response.json()    
 
 class TaxiDb:
     """Работа с локальной базой taxi.db (улицы, города)."""

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Смена — Letz Driver Stats</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/custom.css">
+</head>
+<body class="bg-light">
+
+<div class="container py-3" style="max-width: 540px;">
+
+    <div class="app-header d-flex align-items-center mb-4">
+        <a href="/" class="btn btn-outline-light me-3">← Назад</a>
+        <h1 class="fw-bold mb-0 fs-4">🕐 Смена</h1>
+    </div>
+
+    <div id="loader" class="text-center d-none mb-4">
+        <div class="spinner-border text-success"></div>
+    </div>
+
+    <div id="error" class="alert alert-danger d-none"></div>
+    <div id="success" class="alert alert-success d-none"></div>
+
+    <!-- Нет открытой смены -->
+    <div id="noShift" class="d-none text-center">
+        <p class="text-muted mb-3">Нет открытой смены</p>
+        <button class="btn btn-success btn-lg w-100" onclick="openShift()">
+            🔓 Открыть смену
+        </button>
+    </div>
+
+    <!-- Открытая смена -->
+    <div id="shiftContent" class="d-none">
+
+        <!-- Инфо -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">Открыта:</span>
+                    <strong id="shiftOpenedAt">-</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">Заказов:</span>
+                    <strong id="shiftOrders">0</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">Доход:</span>
+                    <strong id="shiftIncome">0 MDL</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">Комиссия:</span>
+                    <strong id="shiftCommission" class="text-danger">0 MDL</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">Км (из заказов):</span>
+                    <strong id="shiftKm">0 км</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Поля ввода -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label small">📋 План на смену (MDL)</label>
+                    <input type="number" class="form-control" id="planMdl" step="0.01" oninput="autoSave()">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">🧾 Z-отчёт (MDL)</label>
+                    <input type="number" class="form-control" id="zReportMdl" step="0.01" oninput="autoSave()">
+                    <div class="form-text small">Лимит: 1500 MDL, свыше — 12%</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">⛽ Топливо (лей)</label>
+                    <input type="number" class="form-control" id="fuelLei" step="0.01" oninput="autoSave()">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">🛣️ Километраж за смену</label>
+                    <input type="number" class="form-control" id="totalKm" step="0.1" oninput="autoSave()">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">📝 Заметки</label>
+                    <textarea class="form-control" id="notes" rows="2" oninput="autoSave()"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Итог -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-body py-2">
+                <h5 class="mb-3">📊 Итог смены</h5>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">Доход из заказов:</span>
+                    <strong id="resultIncome">0 MDL</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">Z-отчёт:</span>
+                    <strong id="resultZ">0 MDL</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">% с Z-отчёта (12% свыше 1500):</span>
+                    <strong id="resultZPercent" class="text-danger">0 MDL</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">Разница (Z − Доход):</span>
+                    <strong id="resultDiff">0 MDL</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">Топливо:</span>
+                    <strong id="resultFuel">0 MDL</strong>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">📈 Чистый доход:</span>
+                    <strong id="resultNet" class="text-success">0 MDL</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Закрыть -->
+        <button class="btn btn-danger btn-lg w-100" onclick="closeShift()">
+            🔒 Закрыть смену
+        </button>
+    </div>
+
+</div>
+
+<script>
+    let currentShiftId = null;
+    let autoSaveTimer = null;
+
+    const Z_LIMIT = 1500;
+    const Z_PERCENT = 12;
+
+    async function loadShift() {
+        const loader = document.getElementById('loader');
+        loader.classList.remove('d-none');
+        try {
+            const resp = await fetch('/api/shift');
+            const data = await resp.json();
+            if (data.open) {
+                document.getElementById('noShift').classList.add('d-none');
+                document.getElementById('shiftContent').classList.remove('d-none');
+                currentShiftId = data.id;
+                document.getElementById('shiftOpenedAt').textContent = data.opened_at?.replace('T', ' ').slice(0, 16) || '-';
+                document.getElementById('shiftOrders').textContent = data.stats?.orders || 0;
+                document.getElementById('shiftIncome').textContent = (data.stats?.income || 0).toFixed(2) + ' MDL';
+                document.getElementById('shiftCommission').textContent = '-' + (data.stats?.commission || 0).toFixed(2) + ' MDL';
+                document.getElementById('shiftKm').textContent = (data.stats?.distance_km || 0).toFixed(1) + ' км';
+                document.getElementById('planMdl').value = data.plan_mdl || '';
+                document.getElementById('zReportMdl').value = data.z_report_mdl || '';
+                document.getElementById('fuelLei').value = data.fuel_lei || '';
+                document.getElementById('totalKm').value = data.total_km || '';
+                document.getElementById('notes').value = data.notes || '';
+                updateResult();
+            } else {
+                document.getElementById('noShift').classList.remove('d-none');
+                document.getElementById('shiftContent').classList.add('d-none');
+            }
+        } catch (e) {
+            showError(e.message);
+        } finally {
+            loader.classList.add('d-none');
+        }
+    }
+
+    async function openShift() {
+        const loader = document.getElementById('loader');
+        loader.classList.remove('d-none');
+        hideMessages();
+        try {
+            const resp = await fetch('/api/shift', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'open'})
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                showSuccess('✅ Смена открыта!');
+                loadShift();
+            } else {
+                showError(data.error);
+            }
+        } catch (e) {
+            showError(e.message);
+        } finally {
+            loader.classList.add('d-none');
+        }
+    }
+
+    async function closeShift() {
+        if (!confirm('Закрыть смену? Данные сохранятся.')) return;
+        const loader = document.getElementById('loader');
+        loader.classList.remove('d-none');
+        hideMessages();
+        try {
+            const resp = await fetch('/api/shift', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    action: 'close',
+                    shift_id: currentShiftId,
+                    plan_mdl: parseFloat(document.getElementById('planMdl').value) || 0,
+                    z_report_mdl: parseFloat(document.getElementById('zReportMdl').value) || 0,
+                    fuel_lei: parseFloat(document.getElementById('fuelLei').value) || 0,
+                    total_km: parseFloat(document.getElementById('totalKm').value) || 0,
+                    notes: document.getElementById('notes').value,
+                })
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                showSuccess('✅ Смена закрыта!');
+                document.getElementById('shiftContent').classList.add('d-none');
+                document.getElementById('noShift').classList.remove('d-none');
+                currentShiftId = null;
+            } else {
+                showError(data.error);
+            }
+        } catch (e) {
+            showError(e.message);
+        } finally {
+            loader.classList.add('d-none');
+        }
+    }
+
+    async function autoSave() {
+        if (!currentShiftId) return;
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(async () => {
+            try {
+                await fetch('/api/shift', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        action: 'update',
+                        plan_mdl: parseFloat(document.getElementById('planMdl').value) || 0,
+                        z_report_mdl: parseFloat(document.getElementById('zReportMdl').value) || 0,
+                        fuel_lei: parseFloat(document.getElementById('fuelLei').value) || 0,
+                        total_km: parseFloat(document.getElementById('totalKm').value) || 0,
+                        notes: document.getElementById('notes').value,
+                    })
+                });
+            } catch (e) {
+                console.error('AutoSave:', e);
+            }
+            updateResult();
+        }, 800);
+    }
+
+    function updateResult() {
+    const income = parseFloat(document.getElementById('shiftIncome')?.textContent) || 0;
+    const commission = parseFloat(document.getElementById('shiftCommission')?.textContent) || 0;
+    const z = parseFloat(document.getElementById('zReportMdl').value) || 0;
+    const fuel = parseFloat(document.getElementById('fuelLei').value) || 0;
+    const plan = parseFloat(document.getElementById('planMdl').value) || 0;
+
+    // Если план = 0, то и лимит = 0
+    const limit = plan > 0 ? Z_LIMIT : 0;
+    let zPercent = 0;
+    if (z > limit) {
+        zPercent = (z - limit) * Z_PERCENT / 100;
+    }
+
+    const net = income - Math.abs(commission) + z - zPercent - fuel;
+
+    document.getElementById('resultIncome').textContent = income.toFixed(2) + ' MDL';
+    document.getElementById('resultZ').textContent = z.toFixed(2) + ' MDL';
+    document.getElementById('resultZPercent').textContent = zPercent.toFixed(2) + ' MDL';
+    document.getElementById('resultDiff').textContent = (z - income).toFixed(2) + ' MDL';
+    document.getElementById('resultFuel').textContent = fuel.toFixed(2) + ' MDL';
+    document.getElementById('resultNet').textContent = net.toFixed(2) + ' MDL';
+}
+
+    function showError(msg) {
+        const el = document.getElementById('error');
+        el.textContent = '❌ ' + msg;
+        el.classList.remove('d-none');
+    }
+
+    function showSuccess(msg) {
+        const el = document.getElementById('success');
+        el.textContent = msg;
+        el.classList.remove('d-none');
+        setTimeout(() => el.classList.add('d-none'), 3000);
+    }
+
+    function hideMessages() {
+        document.getElementById('error').classList.add('d-none');
+        document.getElementById('success').classList.add('d-none');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadShift);
+</script>
+</body>
+</html>

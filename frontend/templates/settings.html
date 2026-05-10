@@ -3,21 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Настройки</title>
+    <title>Настройки — Letz Driver Stats</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+    <link rel="stylesheet" href="/static/css/custom.css">
 </head>
-</div>  <!-- Закрывающий div карточки -->
-
-</div>  <!-- container -->
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    // Ваш скрипт здесь
-</script>
-</body>
-</html>
 <body class="bg-light">
+
 <div class="container py-3" style="max-width: 540px;">
 
     <div class="app-header d-flex align-items-center mb-4">
@@ -49,6 +40,10 @@
             <div class="mb-3">
                 <label class="form-label small">Access Token</label>
                 <input class="form-control" id="accessToken">
+            </div>
+            <div class="mb-3">
+                <label class="form-label small">Device ID</label>
+                <input class="form-control" id="deviceId">
             </div>
             <button class="btn btn-success w-100" onclick="saveSettings()">💾 Сохранить</button>
         </div>
@@ -84,10 +79,11 @@
         try {
             const resp = await fetch('/api/settings');
             const data = await resp.json();
-            document.getElementById('appName').value = data.app_name;
-            document.getElementById('appVersion').value = data.app_version;
-            document.getElementById('startDate').value = data.start_date;
-            document.getElementById('accessToken').value = data.access_token;
+            document.getElementById('appName').value = data.app_name || '';
+            document.getElementById('appVersion').value = data.app_version || '';
+            document.getElementById('startDate').value = data.start_date || '';
+            document.getElementById('accessToken').value = data.access_token || '';
+            document.getElementById('deviceId').value = data.device_id || '';
         } catch (e) {
             console.error(e);
         }
@@ -111,12 +107,14 @@
                     app_version: document.getElementById('appVersion').value,
                     start_date: document.getElementById('startDate').value,
                     access_token: document.getElementById('accessToken').value,
+                    device_id: document.getElementById('deviceId').value,
                 }),
             });
             const data = await resp.json();
             if (data.ok) {
-                success.textContent = '✅ Настройки сохранены!';
+                success.textContent = '✅ Настройки сохранены в config.py!';
                 success.classList.remove('d-none');
+                setTimeout(() => success.classList.add('d-none'), 3000);
             }
         } catch (e) {
             error.textContent = '❌ ' + e.message;
@@ -125,7 +123,7 @@
             loader.classList.add('d-none');
         }
     }
-    
+
     async function loadSystemInfo() {
         try {
             const resp = await fetch('/api/system-info');
@@ -149,9 +147,9 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-    loadSettings();
-    loadSystemInfo();
-});
+        loadSettings();
+        loadSystemInfo();
+    });
 </script>
 </body>
 </html>
