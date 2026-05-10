@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Новый платёж — {{ app_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/custom.css">
+</head>
+<body class="bg-light">
+<div class="container py-3" style="max-width: 540px;">
+
+    <div class="app-header d-flex align-items-center mb-4">
+        <a href="/accounting" class="btn btn-outline-light me-3">← Назад</a>
+        <h1 class="fw-bold mb-0 fs-4">💵 Новый платёж</h1>
+    </div>
+
+    <div id="loader" class="text-center d-none mb-4"><div class="spinner-border text-success"></div></div>
+    <div id="error" class="alert alert-danger d-none"></div>
+    <div id="success" class="alert alert-success d-none"></div>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label small">Смена #</label>
+                <select class="form-select" id="shiftSelect" onchange="loadShiftData()">
+                    <option value="">— Выбери смену —</option>
+                </select>
+            </div>
+
+            <h5 class="mb-3">📌 Начисления (автоматически из смены)</h5>
+            <div class="d-flex justify-content-between"><span>План:</span><strong id="a-plan">0 MDL</strong></div>
+            <div class="d-flex justify-content-between"><span>Топливо:</span><strong id="a-fuel">0 MDL</strong></div>
+            <div class="d-flex justify-content-between"><span>% Z:</span><strong id="a-zpercent">0 MDL</strong></div>
+            <hr>
+            <div class="d-flex justify-content-between"><span>Итого долг:</span><strong id="a-debt" class="text-danger">0 MDL</strong></div>
+
+            <h5 class="mb-3 mt-4">💵 Оплата</h5>
+            <div class="mb-2">
+                <label class="form-label small">Наличные</label>
+                <input type="number" class="form-control" id="paidCash" step="0.01" oninput="calcBalance()">
+            </div>
+            <div class="mb-2">
+                <label class="form-label small">С баланса</label>
+                <input type="number" class="form-control" id="paidBalance" step="0.01" oninput="calcBalance()">
+            </div>
+            <div class="mb-2">
+                <label class="form-label small">С QR</label>
+                <input type="number" class="form-control" id="paidQr" step="0.01" oninput="calcBalance()">
+            </div>
+            <div class="mb-3">
+                <label class="form-label small">Заметки</label>
+                <input class="form-control" id="notes">
+            </div>
+            <hr>
+            <div class="d-flex justify-content-between"><span>Итого оплачено:</span><strong id="a-paid">0 MDL</strong></div>
+            <div class="d-flex justify-content-between"><span>Баланс:</span><strong id="a-balance">0 MDL</strong></div>
+
+            <button class="btn btn-success w-100 mt-3" onclick="savePayment()">💾 Сохранить платёж</button>
+        </div>
+    </div>
+</div>
+
+<p class="text-center text-muted small mt-4">{{ app_name }} v{{ app_version }} © deepCloud App</p>
+
+<script>
+    async function loadShifts() {
+        const resp = await fetch('/api/shifts');
+        const data = await resp.json();
+        const select = document.getElementById('shiftSelect');
+        for (const s of data.shifts || []) {
+            select.innerHTML += `<option value="${s.id}">Смена #${s.id} (${s.opened_at?.slice(0,10)})</option>`;
+        }
+    }
+
+    async function loadShiftData() {
+        const shiftId = document.getElementById('shiftSelect').value;
+        if (!shiftId) return;
+        const resp = await fetch('/api/shift/' + shiftId);
+        const data = await resp.json();
+        document.getElementById('a-plan').textContent = (data.plan_mdl || 0).toFixed(2) + ' MDL';
+        document.getElementById('a-fuel').textContent = (data.fuel_lei || 0).toFixed(2) + ' MDL';
+        document.getElementById('a-zpercent').textContent = (data.z_percent || 0).toFixed(2) + ' MDL';
+        const debt = (data.plan_mdl || 0) + (data.fuel_lei || 0) + (data.z_percent || 0);
+        document.getElementById('a-debt').textContent = debt.toFixed(2) + ' MDL';
+        calcBalance();
+    }
+
+    function calcBalance() {
+        const debt = parseFloat(document.getElementById('a-debt')?.textContent) || 0;
+        const cash = parseFloat(document.getElementById('paidCash').value) || 0;
+        const bal = parseFloat(document.getElementById('paidBalance').value) || 0;
+        const qr = parseFloat(document.getElementById('paidQr').value) || 0;
+        const paid = cash + bal + qr;
+        document.getElementById('a-paid').textContent = paid.toFixed(2) + ' MDL';
+        const diff = paid - debt;
+        const el = document.getElementById('a-balance');
+        el.textContent = diff.toFixed(2) + ' MDL';
+        el.className = diff >= 0 ? 'text-success' : 'text-danger';
+    }
+
+    async function savePayment() {
+        const shiftId = document.getElementById('shiftSelect').value;
+        if (!shiftId) return alert('Выбери смену!');
+        document.getElementById('loader').classList.remove('d-none');
+        try {
+            const resp = await fetch('/api/accounting', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    shift_id: parseInt(shiftId),
+                    plan_mdl: parseFloat(document.getElementById('a-plan')?.textContent) || 0,
+                    fuel_lei: parseFloat(document.getElementById('a-fuel')?.textContent) || 0,
+                    z_percent: parseFloat(document.getElementById('a-zpercent')?.textContent) || 0,
+                    paid_cash: parseFloat(document.getElementById('paidCash').value) || 0,
+                    paid_balance: parseFloat(document.getElementById('paidBalance').value) || 0,
+                    paid_qr: parseFloat(document.getElementById('paidQr').value) || 0,
+                    notes: document.getElementById('notes').value,
+                })
+            });
+            if (resp.ok) {
+                document.getElementById('success').textContent = '✅ Платёж сохранён!';
+                document.getElementById('success').classList.remove('d-none');
+                setTimeout(() => document.getElementById('success').classList.add('d-none'), 2000);
+            }
+        } catch (e) {
+            document.getElementById('error').textContent = '❌ ' + e.message;
+            document.getElementById('error').classList.remove('d-none');
+        } finally {
+            document.getElementById('loader').classList.add('d-none');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadShifts);
+</script>
+</body>
+</html>

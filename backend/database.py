@@ -1,6 +1,6 @@
 """
 Модуль базы данных SQLite.
-Хранение истории заказов, смен и статистики по дням.
+Хранение истории заказов, смен, статистики и бухгалтерии.
 """
 
 import sqlite3
@@ -16,22 +16,13 @@ class Database:
         self._create_tables()
         self._migrate()
 
-    # ----------------------------------------------------------
-    # Миграции
-    # ----------------------------------------------------------
-
     def _migrate(self):
-        """Добавляет новые колонки, если их ещё нет."""
         with sqlite3.connect(self.db_path) as conn:
             try:
                 conn.execute("ALTER TABLE orders ADD COLUMN shift_id INTEGER")
                 conn.commit()
             except sqlite3.OperationalError:
                 pass
-
-    # ----------------------------------------------------------
-    # Создание таблиц
-    # ----------------------------------------------------------
 
     def _create_tables(self):
         with sqlite3.connect(self.db_path) as conn:
@@ -71,19 +62,32 @@ class Database:
                     notes TEXT DEFAULT ''
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS accounting (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    shift_id INTEGER,
+                    date TEXT NOT NULL,
+                    plan_mdl REAL DEFAULT 0,
+                    fuel_lei REAL DEFAULT 0,
+                    z_percent REAL DEFAULT 0,
+                    total_debt REAL DEFAULT 0,
+                    paid_cash REAL DEFAULT 0,
+                    paid_balance REAL DEFAULT 0,
+                    paid_qr REAL DEFAULT 0,
+                    total_paid REAL DEFAULT 0,
+                    balance REAL DEFAULT 0,
+                    notes TEXT DEFAULT '',
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             conn.commit()
-
-    # ----------------------------------------------------------
-    # Расчёт Z-процента
-    # ----------------------------------------------------------
 
     @staticmethod
     def calc_z_percent(z_report_mdl, plan_mdl=0):
-        """Считает процент с Z-отчёта. Если план = 0, лимита нет."""
-        from config import Z_LIMIT, Z_PERCENT
-        limit = Z_LIMIT if plan_mdl and plan_mdl > 0 else 0
-        if z_report_mdl and z_report_mdl > limit:
-            return round((z_report_mdl - limit) * Z_PERCENT / 100, 2)
+        if plan_mdl and plan_mdl > 0 and z_report_mdl and z_report_mdl > Z_LIMIT:
+            return round((z_report_mdl - Z_LIMIT) * Z_PERCENT / 100, 2)
+        if (not plan_mdl or plan_mdl == 0) and z_report_mdl and z_report_mdl > 0:
+            return round(z_report_mdl * Z_PERCENT / 100, 2)
         return 0.0
 
     # ----------------------------------------------------------
@@ -193,11 +197,11 @@ class Database:
         with sqlite3.connect(self.db_path) as conn:
             row = conn.execute(
                 """SELECT 
-                    COUNT(*) as orders_count,
-                    COALESCE(SUM(amount), 0) as income,
-                    COALESCE(SUM(commission), 0) as commission,
-                    COALESCE(SUM(distance_km), 0) as distance_km
-                FROM orders WHERE shift_id = ?""",
+                       COUNT(*) as orders_count,
+                       COALESCE(SUM(amount), 0) as income,
+                       COALESCE(SUM(commission), 0) as commission,
+                       COALESCE(SUM(distance_km), 0) as distance_km
+                   FROM orders WHERE shift_id = ?""",
                 (shift_id,)
             ).fetchone()
             z_row = conn.execute(
@@ -217,14 +221,48 @@ class Database:
             }
 
     # ----------------------------------------------------------
+    # Бухгалтерия
+    # ----------------------------------------------------------
+
+    def save_accounting(self, shift_id, plan_mdl=0, fuel_lei=0, z_percent=0,
+                         paid_cash=0, paid_balance=0, paid_qr=0, notes=""):
+        total_debt = plan_mdl + fuel_lei + z_percent
+        total_paid = paid_cash + paid_balance + paid_qr
+        balance = total_paid - total_debt
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """INSERT INTO accounting 
+                (shift_id, date, plan_mdl, fuel_lei, z_percent, total_debt,
+                 paid_cash, paid_balance, paid_qr, total_paid, balance, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (shift_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                 plan_mdl, fuel_lei, z_percent, total_debt,
+                 paid_cash, paid_balance, paid_qr, total_paid, balance, notes)
+            )
+            conn.commit()
+
+    def get_accounting(self, limit=50):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM accounting ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def get_accounting_total(self):
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT COALESCE(SUM(balance), 0) FROM accounting"
+            ).fetchone()
+            return round(row[0], 2)
+
+    # ----------------------------------------------------------
     # Заказы
     # ----------------------------------------------------------
 
     def order_exists(self, order_id: int) -> bool:
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT 1 FROM orders WHERE id = ?", (order_id,)
-            ).fetchone()
+            row = conn.execute("SELECT 1 FROM orders WHERE id = ?", (order_id,)).fetchone()
             return row is not None
 
     def is_empty(self) -> bool:

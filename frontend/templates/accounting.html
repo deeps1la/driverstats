@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Бухгалтерия — {{ app_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/custom.css">
+</head>
+<body class="bg-light">
+<div class="container py-3" style="max-width: 650px;">
+
+    <div class="app-header d-flex align-items-center mb-4">
+        <a href="/" class="btn btn-outline-light me-3">← Назад</a>
+        <h1 class="fw-bold mb-0 fs-4">💰 Бухгалтерия</h1>
+    </div>
+
+    <a href="/payment" class="btn btn-success w-100 mb-3">➕ Новый платёж</a>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body text-center">
+            <span class="text-muted small">Общий баланс:</span>
+            <strong id="totalBalance" class="fs-4">0 MDL</strong>
+        </div>
+    </div>
+
+    <div id="loader" class="text-center d-none mb-4"><div class="spinner-border text-success"></div></div>
+    <div id="error" class="alert alert-danger d-none"></div>
+
+    <div id="rows"></div>
+</div>
+<p class="text-center text-muted small mt-4">{{ app_name }} v{{ app_version }} © deepCloud App</p>
+<script>
+    async function load() {
+        document.getElementById('loader').classList.remove('d-none');
+        
+        try {
+            const resp = await fetch('/api/accounting');
+            const data = await resp.json();
+            const total = data.total_balance || 0;
+            const totalEl = document.getElementById('totalBalance');
+            totalEl.textContent = total.toFixed(2) + ' MDL';
+            totalEl.className = 'fs-4 ' + (total >= 0 ? 'text-success' : 'text-danger');
+
+        let html = '';
+        for (const r of data.rows || []) {
+            const bal = r.balance || 0;
+            const date = r.date?.replace('T', ' ').slice(0, 16) || '—';
+            html += `
+            <div class="card shadow-sm mb-2">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <strong>Смена #${r.shift_id}</strong>
+                            <div class="small text-muted">${date}</div>
+                        </div>
+                        <span class="${bal >= 0 ? 'text-success' : 'text-danger'} fw-bold">${bal.toFixed(2)} MDL</span>
+                    </div>
+                    <div class="small text-muted">
+                        Долг: ${r.total_debt?.toFixed(2)} MDL (план ${r.plan_mdl?.toFixed(2)} + топливо ${r.fuel_lei?.toFixed(2)} + Z% ${r.z_percent?.toFixed(2)})
+                    </div>
+                    <div class="small text-muted">
+                        Оплачено: ${r.total_paid?.toFixed(2)} MDL (нал: ${r.paid_cash?.toFixed(2)} | бал: ${r.paid_balance?.toFixed(2)} | QR: ${r.paid_qr?.toFixed(2)})
+                    </div>
+                    ${r.notes ? `<div class="small">📝 ${r.notes}</div>` : ''}
+                </div>
+            </div>`;
+        }
+            document.getElementById('rows').innerHTML = html || '<div class="text-muted text-center">Нет записей</div>';
+        } catch (e) {
+            document.getElementById('error').textContent = '❌ ' + e.message;
+            document.getElementById('error').classList.remove('d-none');
+        } finally {
+            document.getElementById('loader').classList.add('d-none');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</body>
+</html>

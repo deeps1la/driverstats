@@ -8,9 +8,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
 </head>
 <body class="bg-light">
-<!-- ============================================= -->
-<!-- БОКОВОЕ МЕНЮ (Offcanvas) -->
-<!-- ============================================= -->
+
+<!-- БОКОВОЕ МЕНЮ -->
 <div class="offcanvas offcanvas-start" tabindex="-1" id="sidebarMenu">
     <div class="offcanvas-header">
         <h5 class="offcanvas-title">Меню</h5>
@@ -18,10 +17,11 @@
     </div>
     <div class="offcanvas-body">
         <a href="/" class="btn btn-outline-success w-100 mb-2">📊 Главная</a>
-        <a href="/orders" class="btn btn-outline-primary w-100">📋 Все заказы</a>
+        <a href="/accounting" class="btn btn-outline-danger w-100 mb-2">💰 Бухгалтерия</a>
         <a href="/reports" class="btn btn-outline-info w-100 mb-2">📊 Отчёты</a>
         <a href="/shift" class="btn btn-outline-warning w-100 mb-2">🕐 Смена</a>
         <a href="/shifts" class="btn btn-outline-info w-100 mb-2">📋 Смены</a>
+        <a href="/orders" class="btn btn-outline-primary w-100 mb-2">📋 Все заказы</a>
         <a href="/settings" class="btn btn-outline-secondary w-100">⚙️ Настройки</a>
     </div>
 </div>
@@ -30,108 +30,83 @@
 
     <!-- ШАПКА -->
     <div class="app-header d-flex align-items-center">
-        <button class="btn btn-outline-light me-3" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" title="Меню">
-            ☰
-        </button>
+        <button class="btn btn-outline-light me-3" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" title="Меню">☰</button>
         <h1 class="fw-bold mb-0">{{ app_name }}</h1>
     </div>
-<div class="container py-3" style="max-width: 540px;">
 
-    <!-- ============================================= -->
     <!-- БАЛАНС -->
-    <!-- ============================================= -->
-    <div class="text-center mb-4">
+    <div class="text-center mb-4 mt-3">
         <div class="card shadow-sm">
             <div class="card-body py-3">
                 <div class="row">
                     <div class="col-6 border-end">
                         <div class="text-muted small mb-1">Текущий баланс</div>
-                        <div class="fw-bold fs-3" id="balance">-</div>
+                        <div class="fw-bold fs-4" id="balance">-</div>
                     </div>
                     <div class="col-6">
                         <div class="text-muted small mb-1">QR баланс</div>
-                        <div class="fw-bold fs-3" id="qrBalance">-</div>
+                        <div class="fw-bold fs-4" id="qrBalance">-</div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ============================================= -->
-    <!-- КНОПКА ОБНОВЛЕНИЯ -->
-    <!-- ============================================= -->
+    <!-- КНОПКА -->
     <button id="refreshBtn" class="btn btn-success btn-lg w-100 mb-2" onclick="loadStats()">
         📊 ОБНОВИТЬ СТАТИСТИКУ
     </button>
 
-    <div class="text-center text-muted small mb-4" id="lastUpdate">
-        Последнее обновление: -
-    </div>
+    <div class="text-center text-muted small mb-4" id="lastUpdate">Последнее обновление: -</div>
+    <div class="text-center text-muted small mb-2" id="shiftLabel">Текущая смена vs прошлая</div>
 
-    <!-- Спиннер -->
+    <!-- СПИННЕР -->
     <div id="loader" class="text-center d-none mb-4">
         <div class="spinner-border text-success"></div>
         <p class="text-muted mt-2">Загружаем данные...</p>
     </div>
-    <!-- Ошибка -->
+
     <div id="error" class="alert alert-danger d-none"></div>
 
     <!-- КОНТЕНТ -->
     <div id="content" class="d-none">
 
-        <!-- Заказы -->
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="text-muted small">✅ Заказы</span>
-                    <div>
-                        <strong id="orders">-</strong>
-                        <small id="ordersDiff" class="ms-2"></small>
-                    </div>
+                    <div><strong id="orders">-</strong><small id="ordersDiff" class="ms-2"></small></div>
                 </div>
             </div>
         </div>
 
-        <!-- Километраж -->
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="text-muted small">🛣️ Километраж</span>
-                    <div>
-                        <strong id="distance">-</strong>
-                        <small id="distanceDiff" class="ms-2"></small>
-                    </div>
+                    <div><strong id="distance">-</strong><small id="distanceDiff" class="ms-2"></small></div>
                 </div>
             </div>
         </div>
 
-        <!-- Касса брутто -->
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="text-muted small">💰 Касса брутто</span>
-                    <div>
-                        <strong id="income">-</strong>
-                        <small id="incomeDiff" class="ms-2"></small>
-                    </div>
+                    <div><strong id="income">-</strong><small id="incomeDiff" class="ms-2"></small></div>
                 </div>
             </div>
         </div>
 
-        <!-- Комиссия -->
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="text-muted small">💸 Комиссия</span>
-                    <div>
-                        <strong id="commission">-</strong>
-                        <small id="commissionDiff" class="ms-2"></small>
-                    </div>
+                    <div><strong id="commission">-</strong><small id="commissionDiff" class="ms-2"></small></div>
                 </div>
             </div>
         </div>
 
-        <!-- % Z -->
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
                 <div class="d-flex justify-content-between align-items-center">
@@ -141,7 +116,6 @@
             </div>
         </div>
 
-        <!-- План -->
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
                 <div class="d-flex justify-content-between align-items-center">
@@ -151,7 +125,6 @@
             </div>
         </div>
 
-        <!-- Заправка -->
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
                 <div class="d-flex justify-content-between align-items-center">
@@ -161,15 +134,11 @@
             </div>
         </div>
 
-        <!-- Чистый доход -->
         <div class="card shadow-sm mb-3">
             <div class="card-body py-2">
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="text-muted small">📈 Чистый доход</span>
-                    <div>
-                        <strong id="netProfit">-</strong>
-                        <small id="netProfitDiff" class="ms-2"></small>
-                    </div>
+                    <div><strong id="netProfit">-</strong><small id="netProfitDiff" class="ms-2"></small></div>
                 </div>
             </div>
         </div>

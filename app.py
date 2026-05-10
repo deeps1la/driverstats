@@ -2,8 +2,8 @@
 Letz Driver Stats — точка входа.
 Запуск Flask-сервера, маршруты, связь фронтенда с бэкендом.
 """
-APP_NAME = "Letz Driver Stats"
-APP_VERSION = "1.0"
+APP_NAME = "DRIVER STATS"
+APP_VERSION = "1.2 Beta"
 
 # ----------------------------------------------------------
 # Импорты
@@ -76,7 +76,7 @@ def api_balance():
 
 @app.route("/settings")
 def settings_page():
-    return render_template("settings.html")
+    return render_template("settings.html", app_name=APP_NAME, app_version=APP_VERSION)
 
 @app.route("/api/settings", methods=["GET", "POST"])
 def api_settings():
@@ -197,7 +197,7 @@ def api_system_info():
 
 @app.route("/orders")
 def orders_page():
-    return render_template("orders.html")
+    return render_template("orders.html", app_name=APP_NAME, app_version=APP_VERSION)
 
 
 @app.route("/api/orders")
@@ -235,7 +235,7 @@ def api_order_detail(order_id):
 
 @app.route("/api/stats")
 def api_stats():
-    today = datetime.now().strftime("%Y-%m-%d")
+    # Авторизация и загрузка транзакций (как раньше)
     auth = LetzAuth()
     session_id = auth.login()
     if not session_id:
@@ -248,6 +248,7 @@ def api_stats():
 
     balance = transactions_data.get("CurrentBalance", 0)
 
+    # Сохраняем новые заказы
     all_transactions = []
     for day in transactions_data.get("Data", []):
         day_str = day.get("Day", "")[:10]
@@ -295,29 +296,40 @@ def api_stats():
         except Exception as e:
             print(f"  ⚠️ Ошибка заказа #{tx['Id']}: {e}")
 
-    print(f"🆕 Загружено новых заказов: {new_count}")
+    # Статистика: текущая смена vs прошлая смена
+    current = db.get_current_shift()
+    current_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0}
 
-    all_days = {}
-    for day in transactions_data.get("Data", []):
-        day_str = day.get("Day", "")[:10]
-        day_transactions = day.get("Transactions", [])
-        all_days[day_str] = calculate_stats(day_transactions)
+    if current:
+        cs = db.get_shift_stats(current["id"])
+        current_stats = {
+            "orders": cs["orders"],
+            "income": cs["income"],
+            "commission": cs["commission"],
+            "net_profit": cs["net_profit"],
+            "distance_km": cs["distance_km"],
+        }
 
-    today_stats = all_days.get(today, {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0})
-    yesterday_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0}
-    sorted_days = sorted([d for d in all_days.keys() if d < today], reverse=True)
-    for d in sorted_days:
-        if all_days[d]["orders"] > 0:
-            yesterday_stats = all_days[d]
+    # Прошлая закрытая смена
+    prev_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0}
+    all_shifts = db.get_shifts(limit=50)
+    for s in all_shifts:
+        if s["closed_at"] is not None:
+            ps = db.get_shift_stats(s["id"])
+            prev_stats = {
+                "orders": ps["orders"],
+                "income": ps["income"],
+                "commission": ps["commission"],
+                "net_profit": ps["net_profit"],
+                "distance_km": ps["distance_km"],
+            }
             break
 
-    today_db = db.get_total_stats(from_date=today, to_date=today)
-    today_stats["distance_km"] = today_db["distance_km"]
-
     return jsonify({
-        "today": today_stats,
-        "yesterday": yesterday_stats,
+        "today": current_stats,
+        "yesterday": prev_stats,
         "balance": balance,
+        "shift_open": current is not None,
         "last_update": datetime.now().strftime("%d.%m.%Y %H:%M"),
     })
 
@@ -328,7 +340,7 @@ def api_stats():
 
 @app.route("/reports")
 def reports_page():
-    return render_template("reports.html")
+    return render_template("reports.html", app_name=APP_NAME, app_version=APP_VERSION)
 
 
 @app.route("/api/report")
@@ -361,17 +373,17 @@ def api_report():
 
 @app.route("/shift")
 def shift_page():
-    return render_template("shift.html")
+    return render_template("shift.html", app_name=APP_NAME, app_version=APP_VERSION)
 
 
 @app.route("/shifts")
 def shifts_page():
-    return render_template("shifts.html")
+    return render_template("shifts.html", app_name=APP_NAME, app_version=APP_VERSION)
 
 
 @app.route("/shift/<int:shift_id>")
 def shift_detail_page(shift_id):
-    return render_template("shift_detail.html", shift_id=shift_id)
+    return render_template("shift_detail.html", shift_id=shift_id, app_name=APP_NAME, app_version=APP_VERSION)
 
 
 @app.route("/api/shift", methods=["GET", "POST"])
@@ -476,6 +488,39 @@ def api_qr_balance():
     except:
         return jsonify({"qr_balance": "0"})
 
+# ----------------------------------------------------------
+# Бухгалтерия
+# ----------------------------------------------------------
+
+@app.route("/accounting")
+def accounting_page():
+    return render_template("accounting.html", app_name=APP_NAME, app_version=APP_VERSION)
+
+
+@app.route("/payment")
+def payment_page():
+    return render_template("payment.html", app_name=APP_NAME, app_version=APP_VERSION)
+
+
+@app.route("/api/accounting", methods=["GET", "POST"])
+def api_accounting():
+    if request.method == "GET":
+        rows = db.get_accounting()
+        total = db.get_accounting_total()
+        return jsonify({"rows": rows, "total_balance": total})
+
+    data = request.get_json()
+    db.save_accounting(
+        shift_id=data.get("shift_id"),
+        plan_mdl=data.get("plan_mdl", 0),
+        fuel_lei=data.get("fuel_lei", 0),
+        z_percent=data.get("z_percent", 0),
+        paid_cash=data.get("paid_cash", 0),
+        paid_balance=data.get("paid_balance", 0),
+        paid_qr=data.get("paid_qr", 0),
+        notes=data.get("notes", ""),
+    )
+    return jsonify({"ok": True})
 
 # ----------------------------------------------------------
 # Запуск сервера
