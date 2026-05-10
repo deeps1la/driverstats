@@ -74,17 +74,24 @@
     }
 
     async function loadShiftData() {
-        const shiftId = document.getElementById('shiftSelect').value;
-        if (!shiftId) return;
-        const resp = await fetch('/api/shift/' + shiftId);
-        const data = await resp.json();
-        document.getElementById('a-plan').textContent = (data.plan_mdl || 0).toFixed(2) + ' MDL';
-        document.getElementById('a-fuel').textContent = (data.fuel_lei || 0).toFixed(2) + ' MDL';
-        document.getElementById('a-zpercent').textContent = (data.z_percent || 0).toFixed(2) + ' MDL';
-        const debt = (data.plan_mdl || 0) + (data.fuel_lei || 0) + (data.z_percent || 0);
-        document.getElementById('a-debt').textContent = debt.toFixed(2) + ' MDL';
-        calcBalance();
-    }
+    const shiftId = document.getElementById('shiftSelect').value;
+    if (!shiftId) return;
+
+    const resp = await fetch('/api/shift/' + shiftId);
+    const data = await resp.json();
+
+    document.getElementById('a-plan').textContent = (data.plan_mdl || 0).toFixed(2) + ' MDL';
+    document.getElementById('a-fuel').textContent = (data.fuel_lei || 0).toFixed(2) + ' MDL';
+    document.getElementById('a-zpercent').textContent = (data.z_percent || 0).toFixed(2) + ' MDL';
+    const debt = (data.plan_mdl || 0) + (data.fuel_lei || 0) + (data.z_percent || 0);
+    document.getElementById('a-debt').textContent = debt.toFixed(2) + ' MDL';
+
+    // Автовставка QR из смены
+    const qr = parseFloat((data.qr_balance || '0').replace(',', '.')) || 0;
+    document.getElementById('paidQr').value = qr || '';
+
+    calcBalance();
+}
 
     function calcBalance() {
         const debt = parseFloat(document.getElementById('a-debt')?.textContent) || 0;

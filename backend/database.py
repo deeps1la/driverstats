@@ -21,6 +21,8 @@ class Database:
             try:
                 conn.execute("ALTER TABLE orders ADD COLUMN shift_id INTEGER")
                 conn.commit()
+                conn.execute("ALTER TABLE shifts ADD COLUMN qr_balance TEXT DEFAULT '0'")
+                conn.commit()
             except sqlite3.OperationalError:
                 pass
 
@@ -59,6 +61,7 @@ class Database:
                     z_report_mdl REAL DEFAULT 0,
                     fuel_lei REAL DEFAULT 0,
                     total_km REAL DEFAULT 0,
+                    qr_balance TEXT DEFAULT '0',
                     notes TEXT DEFAULT ''
                 )
             """)
@@ -111,17 +114,17 @@ class Database:
             conn.commit()
             return cursor.lastrowid
 
-    def close_shift(self, shift_id, plan_mdl=0, z_report_mdl=0, fuel_lei=0, total_km=0, notes=""):
+    def close_shift(self, shift_id, plan_mdl=0, z_report_mdl=0, fuel_lei=0, total_km=0, qr_balance="0", notes=""):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 """UPDATE shifts 
-                   SET closed_at = ?, plan_mdl = ?, z_report_mdl = ?, 
-                       fuel_lei = ?, total_km = ?, notes = ?
-                   WHERE id = ?""",
+                SET closed_at = ?, plan_mdl = ?, z_report_mdl = ?, 
+                    fuel_lei = ?, total_km = ?, qr_balance = ?, notes = ?
+                WHERE id = ?""",
                 (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                 plan_mdl, z_report_mdl, fuel_lei, total_km, notes, shift_id)
+                plan_mdl, z_report_mdl, fuel_lei, total_km, qr_balance, notes, shift_id)
             )
-            conn.commit()
+        conn.commit()
 
     def update_shift_data(self, shift_id, plan_mdl=None, z_report_mdl=None, fuel_lei=None, total_km=None, notes=None):
         fields = []
@@ -165,6 +168,7 @@ class Database:
             if not shift:
                 return None
             shift = dict(shift)
+            shift["qr_balance"] = shift.get("qr_balance", "0")
 
             orders = conn.execute(
                 "SELECT * FROM orders WHERE shift_id = ? ORDER BY date ASC",
@@ -197,18 +201,19 @@ class Database:
         with sqlite3.connect(self.db_path) as conn:
             row = conn.execute(
                 """SELECT 
-                       COUNT(*) as orders_count,
-                       COALESCE(SUM(amount), 0) as income,
-                       COALESCE(SUM(commission), 0) as commission,
-                       COALESCE(SUM(distance_km), 0) as distance_km
-                   FROM orders WHERE shift_id = ?""",
+                    COUNT(*) as orders_count,
+                    COALESCE(SUM(amount), 0) as income,
+                    COALESCE(SUM(commission), 0) as commission,
+                    COALESCE(SUM(distance_km), 0) as distance_km
+                FROM orders WHERE shift_id = ?""",
                 (shift_id,)
             ).fetchone()
             z_row = conn.execute(
-                "SELECT z_report_mdl, plan_mdl FROM shifts WHERE id = ?", (shift_id,)
+                "SELECT z_report_mdl, plan_mdl, qr_balance FROM shifts WHERE id = ?", (shift_id,)
             ).fetchone()
             z_report = z_row[0] if z_row else 0
             plan = z_row[1] if z_row else 0
+            qr = z_row[2] if z_row else "0"
             z_percent = self.calc_z_percent(z_report, plan)
             net = row[1] - row[2] - z_percent
             return {
@@ -218,6 +223,7 @@ class Database:
                 "z_percent": z_percent,
                 "net_profit": round(net, 2),
                 "distance_km": round(row[3], 1),
+                "qr_balance": qr,
             }
 
     # ----------------------------------------------------------

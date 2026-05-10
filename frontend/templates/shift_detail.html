@@ -62,6 +62,11 @@
         </div>
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span class="text-muted small">QR на момент закрытия</span><strong id="s-qr">0 MDL</strong></div>
+            </div>
+        </div>
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
                 <div class="d-flex justify-content-between"><span class="text-muted small">💸 Комиссия</span><strong id="s-commission" class="text-danger">0 MDL</strong></div>
             </div>
         </div>
@@ -137,6 +142,7 @@
             document.getElementById('s-zpercent').textContent = (data.z_percent || 0).toFixed(2) + ' MDL';
             document.getElementById('s-fuel').textContent = (data.fuel_lei || 0).toFixed(2) + ' MDL';
             document.getElementById('s-net').textContent = (data.net_after_z || 0).toFixed(2) + ' MDL';
+            document.getElementById('s-qr').textContent = (data.qr_balance || '0') + ' MDL';
 
             if (data.notes) {
                 document.getElementById('s-notes-block').classList.remove('d-none');

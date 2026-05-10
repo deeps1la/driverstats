@@ -410,15 +410,32 @@ def api_shift():
         shift_id = data.get("shift_id")
         if not shift_id:
             return jsonify({"error": "Нет shift_id"}), 400
+
+        # Получаем QR-баланс
+        qr_balance = "0"
+        try:
+            auth = LetzAuth()
+            session_id = auth.login()
+            if session_id:
+                api = LetzApi(session_id)
+                overview = api.fetch_car_nickname_overview()
+                for r in overview.get("Info", {}).get("InfoRecords", []):
+                    if r.get("Name") == "Баланс QR":
+                        qr_balance = r.get("Value", "0")
+                        break
+        except:
+            pass
+
         db.close_shift(
             shift_id=shift_id,
             plan_mdl=data.get("plan_mdl", 0),
             z_report_mdl=data.get("z_report_mdl", 0),
             fuel_lei=data.get("fuel_lei", 0),
             total_km=data.get("total_km", 0),
+            qr_balance=qr_balance,
             notes=data.get("notes", ""),
         )
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "qr_balance": qr_balance})
 
     elif action == "update":
         shift = db.get_current_shift()

@@ -213,7 +213,7 @@
             });
             const data = await resp.json();
             if (data.ok) {
-                showSuccess('✅ Смена закрыта!');
+                showSuccess('✅ Смена закрыта! QR на момент закрытия: ' + (data.qr_balance || '0') + ' MDL');
                 document.getElementById('shiftContent').classList.add('d-none');
                 document.getElementById('noShift').classList.remove('d-none');
                 currentShiftId = null;
