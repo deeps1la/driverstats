@@ -38,7 +38,51 @@ app = Flask(
 
 START_DATE = "2026-05-09"
 db = Database()
+# ----------------------------------------------------------
+# Настройки из БД (приоритет над config.py)
+# ----------------------------------------------------------
 
+def get_access_token():
+    token = db.get_setting("access_token")
+    if token:
+        return token
+    from config import LETZ_ACCESS_TOKEN
+    db.set_setting("access_token", LETZ_ACCESS_TOKEN)
+    return LETZ_ACCESS_TOKEN
+
+def get_device_id():
+    device = db.get_setting("device_id")
+    if device:
+        return device
+    from config import LETZ_DEVICE_ID
+    db.set_setting("device_id", LETZ_DEVICE_ID)
+    return LETZ_DEVICE_ID
+
+def init_settings():
+    from config import LETZ_ACCESS_TOKEN, LETZ_DEVICE_ID
+    defaults = {
+        "access_token": LETZ_ACCESS_TOKEN,
+        "device_id": LETZ_DEVICE_ID,
+        "start_date": START_DATE,
+        "app_name": APP_NAME,
+        "app_version": APP_VERSION,
+    }
+    for key, value in defaults.items():
+        if not db.get_setting(key):
+            db.set_setting(key, value)
+
+# Загружаем сохранённые
+saved_start = db.get_setting("start_date")
+if saved_start:
+    START_DATE = saved_start
+saved_name = db.get_setting("app_name")
+if saved_name:
+    APP_NAME = saved_name
+saved_version = db.get_setting("app_version")
+if saved_version:
+    APP_VERSION = saved_version
+
+init_settings()
 
 def get_current_shift_id():
     """Возвращает ID открытой смены или None."""
@@ -57,8 +101,9 @@ def index():
 
 @app.route("/api/balance")
 def api_balance():
-    auth = LetzAuth()
+    auth = LetzAuth(access_token=get_access_token(), device_id=get_device_id())
     session_id = auth.login()
+    print(f"[DEBUG] Используем токен: {get_access_token()[:10]}...")
     if not session_id:
         return jsonify({"balance": 0})
     api = LetzApi(session_id)
@@ -80,40 +125,31 @@ def settings_page():
 
 @app.route("/api/settings", methods=["GET", "POST"])
 def api_settings():
-    import config
     if request.method == "GET":
         return jsonify({
             "start_date": START_DATE,
             "app_name": APP_NAME,
             "app_version": APP_VERSION,
-            "access_token": config.LETZ_ACCESS_TOKEN,
-            "device_id": config.LETZ_DEVICE_ID,
+            "access_token": get_access_token(),
+            "device_id": get_device_id(),
         })
 
     data = request.get_json()
-    changed = False
-
-    if "start_date" in data:
-        globals()["START_DATE"] = data["start_date"]
-        changed = True
-    if "app_name" in data:
-        globals()["APP_NAME"] = data["app_name"]
-        changed = True
-    if "app_version" in data:
-        globals()["APP_VERSION"] = data["app_version"]
-        changed = True
     if "access_token" in data:
-        config.LETZ_ACCESS_TOKEN = data["access_token"]
-        changed = True
+        db.set_setting("access_token", data["access_token"])
     if "device_id" in data:
-        config.LETZ_DEVICE_ID = data["device_id"]
-        changed = True
-
-    if changed:
-        save_config(config)
+        db.set_setting("device_id", data["device_id"])
+    if "start_date" in data:
+        db.set_setting("start_date", data["start_date"])
+        globals()["START_DATE"] = data["start_date"]
+    if "app_name" in data:
+        db.set_setting("app_name", data["app_name"])
+        globals()["APP_NAME"] = data["app_name"]
+    if "app_version" in data:
+        db.set_setting("app_version", data["app_version"])
+        globals()["APP_VERSION"] = data["app_version"]
 
     return jsonify({"ok": True})
-
 
 def save_config(config_module):
     """Сохраняет текущие настройки в config.py."""
@@ -236,7 +272,7 @@ def api_order_detail(order_id):
 @app.route("/api/stats")
 def api_stats():
     # Авторизация и загрузка транзакций (как раньше)
-    auth = LetzAuth()
+    auth = LetzAuth(access_token=get_access_token(), device_id=get_device_id())
     session_id = auth.login()
     if not session_id:
         return jsonify({"error": "Ошибка авторизации"}), 500
@@ -414,7 +450,7 @@ def api_shift():
         # Получаем QR-баланс
         qr_balance = "0"
         try:
-            auth = LetzAuth()
+            auth = LetzAuth(access_token=get_access_token(), device_id=get_device_id())
             session_id = auth.login()
             if session_id:
                 api = LetzApi(session_id)
@@ -490,7 +526,7 @@ def api_shift_detail(shift_id):
 @app.route("/api/qr-balance")
 def api_qr_balance():
     """Возвращает Баланс QR из GetCarNicknameOverviewInfo."""
-    auth = LetzAuth()
+    auth = LetzAuth(access_token=get_access_token(), device_id=get_device_id())
     session_id = auth.login()
     if not session_id:
         return jsonify({"qr_balance": "0"})

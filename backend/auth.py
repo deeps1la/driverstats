@@ -4,20 +4,19 @@
 """
 
 import requests
-from config import LETZ_BASE_URL, LETZ_ACCESS_TOKEN, LETZ_DEVICE_ID, LETZ_APP_VERSION
+from config import LETZ_BASE_URL, LETZ_APP_VERSION
 
 
 class LetzAuth:
     """Управление входом в Letz API."""
 
-    def __init__(self):
+    def __init__(self, access_token: str = "", device_id: str = ""):
         self.base_url = LETZ_BASE_URL
-        self.access_token = LETZ_ACCESS_TOKEN
-        self.device_id = LETZ_DEVICE_ID
+        self.access_token = access_token
+        self.device_id = device_id
         self.app_version = LETZ_APP_VERSION
 
     def login(self) -> str | None:
-        """Авторизация и получение SessionId."""
         try:
             response = requests.get(
                 f"{self.base_url}/login",
@@ -49,7 +48,6 @@ class LetzAuth:
             return None
 
     def get_driver_info(self) -> dict:
-        """Получение информации о водителе."""
         try:
             response = requests.get(
                 f"{self.base_url}/login",

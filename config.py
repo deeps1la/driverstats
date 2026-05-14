@@ -7,7 +7,7 @@
 # API Letz
 # ============================================================
 
-LETZ_ACCESS_TOKEN = "521B6F06F1C048029EBA8DD692DF7ACA084D"
+LETZ_ACCESS_TOKEN = "22CE22F81216458B8A1E3C4A8959585205BC"
 LETZ_DEVICE_ID = "4340"
 LETZ_APP_VERSION = "3.9.17"
 LETZ_BASE_URL = "http://letz99.from-md.com/ts.mobilerest"

@@ -83,7 +83,12 @@ class Database:
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            conn.commit()
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """)
 
     @staticmethod
     def calc_z_percent(z_report_mdl, plan_mdl=0):
@@ -360,3 +365,26 @@ class Database:
                 "net_profit": round(row[1] - row[2], 2),
                 "distance_km": round(row[3], 1),
             }
+    # ----------------------------------------------------------
+    # Настройки приложения
+    # ----------------------------------------------------------
+
+    def get_setting(self, key, default=""):
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT value FROM app_settings WHERE key = ?", (key,)
+            ).fetchone()
+            return row[0] if row else default
+
+    def set_setting(self, key, value):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)",
+                (key, str(value))
+            )
+            conn.commit()
+
+    def get_all_settings(self):
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute("SELECT key, value FROM app_settings").fetchall()
+            return dict(rows)        
