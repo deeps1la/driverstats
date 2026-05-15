@@ -21,12 +21,13 @@
     </div>
 
     <div id="error" class="alert alert-danger d-none"></div>
+    <div id="success" class="alert alert-success d-none"></div>
 
     <div id="shiftsList"></div>
 
 </div>
 
-<p class="text-center text-muted small mt-4">{{ app_name }} v{{ app_version }} © deepCloud App</p>
+<p class="text-center text-muted small mt-4">{{ app_name }} v{{ app_version }} © deepCloud</p>
 
 <script>
     async function loadShifts() {
@@ -49,48 +50,80 @@
     }
 
     function renderShifts(shifts) {
-        const list = document.getElementById('shiftsList');
-        if (!shifts.length) {
-            list.innerHTML = '<div class="text-center text-muted py-4">Нет смен</div>';
-            return;
-        }
-
-        let html = '';
-        for (const s of shifts) {
-            const opened = s.opened_at?.replace('T', ' ').slice(0, 16) || '-';
-            const closed = s.closed_at ? s.closed_at.replace('T', ' ').slice(0, 16) : '🟢 Открыта';
-            const income = s.stats?.income || 0;
-            const commission = s.stats?.commission || 0;
-            const net = income - commission;
-            const km = s.total_km || s.stats?.distance_km || 0;
-
-            html += `
-            <a href="/shift/${s.id}" class="text-decoration-none">
-                <div class="card shadow-sm mb-2 shift-card">
-                    <div class="card-body py-2">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>Смена #${s.id}</strong>
-                                <div class="small text-muted">${opened} — ${closed}</div>
-                            </div>
-                            <div class="text-end">
-                                <strong>${income.toFixed(0)} MDL</strong>
-                                <div class="small text-muted">${km.toFixed(1)} км</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </a>`;
-        }
-        list.innerHTML = html;
+    const list = document.getElementById('shiftsList');
+    if (!shifts.length) {
+        list.innerHTML = '<div class="text-center text-muted py-4">Нет смен</div>';
+        return;
     }
+
+    let html = '';
+    for (const s of shifts) {
+        const opened = s.opened_at ? s.opened_at.replace('T', ' ').slice(0, 16) : '-';
+        const closed = s.closed_at ? s.closed_at.replace('T', ' ').slice(0, 16) : '🟢 Открыта';
+        const income = (s.stats && s.stats.income) ? s.stats.income : 0;
+        const km = s.total_km || (s.stats && s.stats.distance_km) || 0;
+
+        html += '<div class="card shadow-sm mb-2 shift-card">';
+        html += '<a href="/shift/' + s.id + '" class="text-decoration-none text-dark">';
+        html += '<div class="card-body py-2">';
+        html += '<div class="d-flex justify-content-between align-items-center">';
+        html += '<div><strong>Смена #' + s.id + '</strong>';
+        html += '<div class="small text-muted">' + opened + ' — ' + closed + '</div></div>';
+        html += '<div class="text-end"><strong>' + income.toFixed(0) + ' MDL</strong>';
+        html += '<div class="small text-muted">' + km.toFixed(1) + ' км</div></div>';
+        html += '</div></div></a>';
+        html += '<div class="text-end pe-2 pb-2">';
+        html += '<button class="btn btn-sm btn-outline-danger" onclick="deleteShift(event, ' + s.id + ')" title="Удалить смену">🗑️ Удалить</button>';
+        html += '</div>';
+        html += '</div>';
+    }
+    list.innerHTML = html;
+}
+async function deleteShift(event, shiftId) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!confirm('Удалить смену #' + shiftId + '?\n\nЗаказы останутся, но будут отвязаны от смены.\nБухгалтерия по этой смене тоже удалится.\n\nЭто действие нельзя отменить.')) {
+        return;
+    }
+
+    if (!confirm('Точно удалить смену #' + shiftId + '?')) {
+        return;
+    }
+
+    const loader = document.getElementById('loader');
+    const error = document.getElementById('error');
+    const success = document.getElementById('success');
+    loader.classList.remove('d-none');
+    error.classList.add('d-none');
+    success.classList.add('d-none');
+
+    try {
+        const resp = await fetch('/api/shift/' + shiftId + '/delete', { method: 'POST' });
+        const data = await resp.json();
+        if (data.ok) {
+            success.textContent = '✅ Смена #' + shiftId + ' удалена';
+            success.classList.remove('d-none');
+            setTimeout(function() { success.classList.add('d-none'); }, 3000);
+            loadShifts();
+        } else {
+            error.textContent = '❌ ' + (data.error || 'Ошибка');
+            error.classList.remove('d-none');
+        }
+    } catch (e) {
+        error.textContent = '❌ ' + e.message;
+        error.classList.remove('d-none');
+    } finally {
+        loader.classList.add('d-none');
+    }
+}
 
     document.addEventListener('DOMContentLoaded', loadShifts);
 </script>
 
 <style>
-    .shift-card { cursor: pointer; transition: transform 0.15s; border: none; border-radius: 12px; }
-    .shift-card:hover { transform: translateY(-2px); background: #f0f9ff; }
+    .shift-card { border: none; border-radius: 12px; }
+    .shift-card a:hover { background: #f0f9ff; border-radius: 12px; }
 </style>
 </body>
 </html>

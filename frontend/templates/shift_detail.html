@@ -44,7 +44,9 @@
             </div>
         </div>
 
-        <!-- Метрики -->
+        <!-- Итог смены -->
+        <h5 class="mb-2">📊 Итог смены</h5>
+
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
                 <div class="d-flex justify-content-between"><span class="text-muted small">📋 План</span><strong id="s-plan">0 MDL</strong></div>
@@ -57,27 +59,27 @@
         </div>
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span class="text-muted small">🛣️ Километраж</span><strong id="s-distance">0 км</strong></div>
+            </div>
+        </div>
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
                 <div class="d-flex justify-content-between"><span class="text-muted small">💰 Доход (из заказов)</span><strong id="s-income">0 MDL</strong></div>
             </div>
         </div>
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
-                <div class="d-flex justify-content-between"><span class="text-muted small">QR на момент закрытия</span><strong id="s-qr">0 MDL</strong></div>
+                <div class="d-flex justify-content-between"><span class="text-muted small">💸 Комиссия Letz</span><strong id="s-commission" class="text-danger">0 MDL</strong></div>
             </div>
         </div>
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
-                <div class="d-flex justify-content-between"><span class="text-muted small">💸 Комиссия</span><strong id="s-commission" class="text-danger">0 MDL</strong></div>
+                <div class="d-flex justify-content-between"><span class="text-muted small">🧾 Z-отчёт (для 12%)</span><strong id="s-zreport">0 MDL</strong></div>
             </div>
         </div>
         <div class="card shadow-sm mb-2">
             <div class="card-body py-2">
-                <div class="d-flex justify-content-between"><span class="text-muted small">🧾 Z-отчёт</span><strong id="s-zreport">0 MDL</strong></div>
-            </div>
-        </div>
-        <div class="card shadow-sm mb-2">
-            <div class="card-body py-2">
-                <div class="d-flex justify-content-between"><span class="text-muted small">💸 % с Z-отчёта (12% свыше 1500)</span><strong id="s-zpercent" class="text-danger">0 MDL</strong></div>
+                <div class="d-flex justify-content-between"><span class="text-muted small">💸 % с Z (12% свыше 1700)</span><strong id="s-zpercent" class="text-danger">0 MDL</strong></div>
             </div>
         </div>
         <div class="card shadow-sm mb-2">
@@ -85,9 +87,20 @@
                 <div class="d-flex justify-content-between"><span class="text-muted small">⛽ Топливо</span><strong id="s-fuel">0 MDL</strong></div>
             </div>
         </div>
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span class="text-muted small">📋 План (расход)</span><strong id="s-plan-expense">0 MDL</strong></div>
+            </div>
+        </div>
+        <hr>
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span class="text-muted small">💸 Всего расходов</span><strong id="s-expenses" class="text-danger">0 MDL</strong></div>
+            </div>
+        </div>
         <div class="card shadow-sm mb-3">
             <div class="card-body py-2">
-                <div class="d-flex justify-content-between"><span class="text-muted small">📈 Чистый доход</span><strong id="s-net" class="text-success">0 MDL</strong></div>
+                <div class="d-flex justify-content-between"><span class="fw-bold">📈 Чистый доход</span><strong id="s-net" class="fs-5">0 MDL</strong></div>
             </div>
         </div>
 
@@ -99,6 +112,9 @@
             </div>
         </div>
 
+        <!-- Кнопка бухгалтерии -->
+        <a href="/shift/{{ shift_id }}/accounting" class="btn btn-outline-danger w-100 mb-3">💰 Расчёт с Urban Sharing</a>
+
         <!-- Список заказов -->
         <h5 class="mb-2">📋 Заказы смены</h5>
         <div id="s-orders-list"></div>
@@ -106,7 +122,7 @@
 
 </div>
 
-<p class="text-center text-muted small mt-4">{{ app_name }} v{{ app_version }} © deepCloud App</p>
+<p class="text-center text-muted small mt-4">{{ app_name }} v{{ app_version }} © deepCloud</p>
 
 <script>
     const CLASS_COLORS = {
@@ -132,17 +148,30 @@
 
             document.getElementById('s-opened').textContent = data.opened_at?.replace('T', ' ').slice(0, 16) || '-';
             document.getElementById('s-closed').textContent = data.closed_at ? data.closed_at.replace('T', ' ').slice(0, 16) : '🟢 Открыта';
-            document.getElementById('s-plan').textContent = (data.plan_mdl || 0).toFixed(2) + ' MDL';
 
             const st = data.stats || {};
+            document.getElementById('s-plan').textContent = (data.plan_mdl || 0).toFixed(2) + ' MDL';
             document.getElementById('s-orders').textContent = st.orders || 0;
+            document.getElementById('s-distance').textContent = (st.distance_km || 0).toFixed(1) + ' км';
             document.getElementById('s-income').textContent = (st.income || 0).toFixed(2) + ' MDL';
-            document.getElementById('s-commission').textContent = '-' + (st.commission || 0).toFixed(2) + ' MDL';
+            document.getElementById('s-commission').textContent = Math.abs(st.commission || 0).toFixed(2) + ' MDL';
             document.getElementById('s-zreport').textContent = (data.z_report_mdl || 0).toFixed(2) + ' MDL';
             document.getElementById('s-zpercent').textContent = (data.z_percent || 0).toFixed(2) + ' MDL';
             document.getElementById('s-fuel').textContent = (data.fuel_lei || 0).toFixed(2) + ' MDL';
-            document.getElementById('s-net').textContent = (data.net_after_z || 0).toFixed(2) + ' MDL';
-            document.getElementById('s-qr').textContent = (data.qr_balance || '0') + ' MDL';
+            document.getElementById('s-plan-expense').textContent = (data.plan_mdl || 0).toFixed(2) + ' MDL';
+
+            // Расходы и чистый доход
+            const commission = Math.abs(st.commission || 0);
+            const zPercent = data.z_percent || 0;
+            const fuel = data.fuel_lei || 0;
+            const plan = data.plan_mdl || 0;
+            const totalExpenses = commission + zPercent + fuel + plan;
+            const net = (st.income || 0) - totalExpenses;
+
+            document.getElementById('s-expenses').textContent = totalExpenses.toFixed(2) + ' MDL';
+            const netEl = document.getElementById('s-net');
+            netEl.textContent = net.toFixed(2) + ' MDL';
+            netEl.className = net >= 0 ? 'fs-5 text-success' : 'fs-5 text-danger';
 
             if (data.notes) {
                 document.getElementById('s-notes-block').classList.remove('d-none');
