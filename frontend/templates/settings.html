@@ -45,6 +45,14 @@
                 <label class="form-label small">Device ID</label>
                 <input class="form-control" id="deviceId">
             </div>
+            <div class="mb-3">
+                <label class="form-label small">Логин</label>
+                <input class="form-control" id="login">
+            </div>
+            <div class="mb-3">
+                <label class="form-label small">Пароль</label>
+                <input type="password" class="form-control" id="password">
+            </div>
             <button class="btn btn-success w-100" onclick="saveSettings()">💾 Сохранить</button>
         </div>
     </div>
@@ -86,6 +94,8 @@
             document.getElementById('startDate').value = data.start_date || '';
             document.getElementById('accessToken').value = data.access_token || '';
             document.getElementById('deviceId').value = data.device_id || '';
+            document.getElementById('login').value = data.login || '';
+            document.getElementById('password').value = data.password || '';
         } catch (e) {
             console.error(e);
         }
@@ -110,13 +120,15 @@
                     start_date: document.getElementById('startDate').value,
                     access_token: document.getElementById('accessToken').value,
                     device_id: document.getElementById('deviceId').value,
-                }),
+                    login: document.getElementById('login').value,
+                    password: document.getElementById('password').value
+                })
             });
             const data = await resp.json();
             if (data.ok) {
-                success.textContent = '✅ Настройки сохранены в config.py!';
+                success.textContent = '✅ Настройки сохранены!';
                 success.classList.remove('d-none');
-                setTimeout(() => success.classList.add('d-none'), 3000);
+                setTimeout(function() { success.classList.add('d-none'); }, 3000);
             }
         } catch (e) {
             error.textContent = '❌ ' + e.message;
@@ -148,7 +160,7 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', function() {
         loadSettings();
         loadSystemInfo();
     });

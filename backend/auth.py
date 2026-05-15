@@ -1,11 +1,11 @@
 """
 Модуль авторизации в API Letz.
 Получает SessionId по AccessToken.
-Маскируется под Android-приложение.
+Поддерживает автоматическое обновление токена через ITS API.
 """
 
 import requests
-from config import LETZ_BASE_URL, LETZ_APP_VERSION
+from config import LETZ_BASE_URL, LETZ_APP_VERSION, ITS_API_URL
 
 
 class LetzAuth:
@@ -42,13 +42,10 @@ class LetzAuth:
             if status == 10:
                 session_id = data.get("SessionId")
                 print(f"[AUTH] ✅ Успешный вход")
-                
-                # Маскируемся под устройство
                 self._report_device(session_id)
-                
                 return session_id
             else:
-                msg = data.get("Message", "Неизвестная ошибка")
+                msg = data.get("Header", {}).get("Msg", data.get("Message", "Неизвестная ошибка"))
                 print(f"[AUTH] ❌ Ошибка: {msg}")
                 return None
 
@@ -105,3 +102,91 @@ class LetzAuth:
         except Exception as e:
             print(f"[AUTH] ❌ Ошибка получения данных: {e}")
             return {}
+
+
+def refresh_access_token(login: str, password: str, device_id: str = "4340") -> str | None:
+    """
+    Получает новый AccessToken через ITS API.
+    Цепочка: postLogin → getDriverProfiles → getNewSession
+    """
+    print("[TOKEN] 🔄 Запуск обновления токена...")
+    
+    # Шаг 1: postLogin
+    print("[TOKEN] Шаг 1: postLogin...")
+    try:
+        resp = requests.post(
+            f"{ITS_API_URL}/Login",
+            json={
+                "Login": login,
+                "Password": password,
+                "MobileDeviceId": login,
+                "AppVersion": LETZ_APP_VERSION,
+            },
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "okhttp/4.12.0",
+            },
+            timeout=30,
+        )
+        data = resp.json()
+        if data.get("Header", {}).get("Status") != 10:
+            print(f"[TOKEN] ❌ postLogin failed: {data.get('Header', {}).get('Msg', '')}")
+            return None
+        its_token = data.get("AccessToken")
+        print(f"[TOKEN] ✅ ITS токен получен")
+    except Exception as e:
+        print(f"[TOKEN] ❌ postLogin error: {e}")
+        return None
+
+    # Шаг 2: getDriverProfiles
+    print("[TOKEN] Шаг 2: getDriverProfiles...")
+    try:
+        resp = requests.post(
+            f"{ITS_API_URL}/Profiles",
+            json={"AccessToken": its_token},
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "okhttp/4.12.0",
+            },
+            timeout=30,
+        )
+        data = resp.json()
+        if data.get("Header", {}).get("Status") != 10:
+            print(f"[TOKEN] ❌ Profiles failed")
+            return None
+        profiles = data.get("Items", [])
+        if not profiles:
+            print("[TOKEN] ❌ Нет профилей")
+            return None
+        identity = profiles[0].get("Identity", "").strip()
+        print(f"[TOKEN] ✅ Профиль: {identity}")
+    except Exception as e:
+        print(f"[TOKEN] ❌ Profiles error: {e}")
+        return None
+
+    # Шаг 3: getNewSession
+    print("[TOKEN] Шаг 3: getNewSession...")
+    try:
+        resp = requests.post(
+            f"{ITS_API_URL}/NewSession",
+            json={
+                "ProfileIdentity": identity,
+                "MetaData": "",
+                "AccessToken": its_token,
+            },
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "okhttp/4.12.0",
+            },
+            timeout=30,
+        )
+        data = resp.json()
+        if data.get("Header", {}).get("Status") != 10:
+            print(f"[TOKEN] ❌ NewSession failed")
+            return None
+        new_token = data.get("AccessToken")
+        print(f"[TOKEN] ✅ Новый AccessToken получен: {new_token[:10]}...")
+        return new_token
+    except Exception as e:
+        print(f"[TOKEN] ❌ NewSession error: {e}")
+        return None

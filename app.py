@@ -11,7 +11,7 @@ APP_VERSION = "1.2 Beta"
 
 from flask import Flask, render_template, jsonify, request
 from config import SERVER_HOST, SERVER_PORT, SERVER_DEBUG, LETZ_ACCESS_TOKEN, DATABASE_PATH
-from backend.auth import LetzAuth
+from backend.auth import LetzAuth, refresh_access_token
 from backend.api_letz import LetzApi, TaxiDb
 from backend.calculator import (
     is_order,
@@ -132,6 +132,8 @@ def api_settings():
             "app_version": APP_VERSION,
             "access_token": get_access_token(),
             "device_id": get_device_id(),
+            "login": db.get_setting("login"),
+            "password": db.get_setting("password"),
         })
 
     data = request.get_json()
@@ -148,6 +150,10 @@ def api_settings():
     if "app_version" in data:
         db.set_setting("app_version", data["app_version"])
         globals()["APP_VERSION"] = data["app_version"]
+    if "login" in data:
+        db.set_setting("login", data["login"])
+    if "password" in data:
+        db.set_setting("password", data["password"])
 
     return jsonify({"ok": True})
 
@@ -168,6 +174,7 @@ LETZ_ACCESS_TOKEN = "{config_module.LETZ_ACCESS_TOKEN}"
 LETZ_DEVICE_ID = "{config_module.LETZ_DEVICE_ID}"
 LETZ_APP_VERSION = "{config_module.LETZ_APP_VERSION}"
 LETZ_BASE_URL = "{config_module.LETZ_BASE_URL}"
+ITS_API_URL = "{config_module.ITS_API_URL}"
 
 # ============================================================
 # Сервер Flask
@@ -270,15 +277,31 @@ def api_order_detail(order_id):
 # ----------------------------------------------------------
 
 @app.route("/api/stats")
+@app.route("/api/stats")
 def api_stats():
+    # Пробуем авторизоваться
     auth = LetzAuth(access_token=get_access_token(), device_id=get_device_id())
     session_id = auth.login()
 
-    # Если авторизация не удалась — отдаём данные из локальной БД
+    # Если токен умер — пробуем обновить
+    if not session_id:
+        login = db.get_setting("login")
+        password = db.get_setting("password")
+        
+        if login and password:
+            print("[STATS] 🔄 Токен умер, пробуем обновить...")
+            new_token = refresh_access_token(login, password, get_device_id())
+            
+            if new_token:
+                db.set_setting("access_token", new_token)
+                print("[STATS] ✅ Токен обновлён, пробуем снова...")
+                auth = LetzAuth(access_token=new_token, device_id=get_device_id())
+                session_id = auth.login()
+
+    # Если всё равно нет — отдаём данные из БД
     if not session_id:
         current = db.get_current_shift()
         current_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0, "z_percent": 0}
-
         if current:
             cs = db.get_shift_stats(current["id"])
             current_stats = {
@@ -290,7 +313,6 @@ def api_stats():
                 "z_percent": cs.get("z_percent", 0),
             }
 
-        # Ищем последнюю закрытую смену
         prev_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0}
         all_shifts = db.get_shifts(limit=50)
         for s in all_shifts:
@@ -314,7 +336,7 @@ def api_stats():
             "cached": True
         })
 
-    # Авторизация успешна — работаем с Letz API
+    # Работаем с Letz API
     api = LetzApi(session_id)
 
     try:
@@ -370,7 +392,6 @@ def api_stats():
     all_transactions.sort(key=lambda x: x.get("Id", 0), reverse=True)
 
     current_shift_id = get_current_shift_id()
-    new_count = 0
     for tx in all_transactions:
         tx_date = tx.get("Time", tx.get("_day", ""))[:10]
         if tx_date < START_DATE:
@@ -402,8 +423,6 @@ def api_stats():
                 details_json=json.dumps(detail),
                 shift_id=current_shift_id,
             )
-            new_count += 1
-            print(f"  ✅ Новый заказ #{tx['Id']}: {dist:.1f} км, {tx['Value']} MDL")
         except Exception as e:
             print(f"  ⚠️ Ошибка заказа #{tx['Id']}: {e}")
 
@@ -443,7 +462,6 @@ def api_stats():
         "shift_open": current is not None,
         "last_update": datetime.now().strftime("%d.%m.%Y %H:%M"),
     })
-
 # ----------------------------------------------------------
 # Отчёты
 # ----------------------------------------------------------
