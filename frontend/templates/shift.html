@@ -70,7 +70,7 @@
                 <div class="mb-3">
                     <label class="form-label small">🧾 Z-отчёт (MDL)</label>
                     <input type="number" class="form-control" id="zReportMdl" step="0.01" oninput="autoSave()">
-                    <div class="form-text small">Лимит: 1500 MDL, свыше — 12%</div>
+                    <div class="form-text small">Лимит: 1700 MDL, свыше — 12%. Если план = 0 — лимита нет</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label small">⛽ Топливо (лей)</label>
@@ -96,25 +96,33 @@
                     <strong id="resultIncome">0 MDL</strong>
                 </div>
                 <div class="d-flex justify-content-between">
-                    <span class="text-muted small">Z-отчёт:</span>
+                    <span class="text-muted small">Z-отчёт (для расчёта 12%):</span>
                     <strong id="resultZ">0 MDL</strong>
                 </div>
                 <div class="d-flex justify-content-between">
-                    <span class="text-muted small">% с Z-отчёта (12% свыше 1500):</span>
+                    <span class="text-muted small">% с Z (12% свыше лимита):</span>
                     <strong id="resultZPercent" class="text-danger">0 MDL</strong>
                 </div>
                 <div class="d-flex justify-content-between">
-                    <span class="text-muted small">Разница (Z − Доход):</span>
-                    <strong id="resultDiff">0 MDL</strong>
+                    <span class="text-muted small">Комиссия Letz:</span>
+                    <strong id="resultCommission" class="text-danger">0 MDL</strong>
                 </div>
                 <div class="d-flex justify-content-between">
                     <span class="text-muted small">Топливо:</span>
                     <strong id="resultFuel">0 MDL</strong>
                 </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted small">План:</span>
+                    <strong id="resultPlan">0 MDL</strong>
+                </div>
                 <hr>
                 <div class="d-flex justify-content-between">
-                    <span class="text-muted small">📈 Чистый доход:</span>
-                    <strong id="resultNet" class="text-success">0 MDL</strong>
+                    <span class="text-muted small">💸 Всего расходов:</span>
+                    <strong id="resultExpenses" class="text-danger">0 MDL</strong>
+                </div>
+                <div class="d-flex justify-content-between mt-2">
+                    <span class="fw-bold">📈 Чистый доход:</span>
+                    <strong id="resultNet" class="fs-5">0 MDL</strong>
                 </div>
             </div>
         </div>
@@ -127,13 +135,13 @@
 
 </div>
 
-<p class="text-center text-muted small mt-4">{{ app_name }} v{{ app_version }} © deepCloud App</p>
+<p class="text-center text-muted small mt-4">{{ app_name }} v{{ app_version }} © deepCloud</p>
 
 <script>
     let currentShiftId = null;
     let autoSaveTimer = null;
 
-    const Z_LIMIT = 1500;
+    const Z_LIMIT = 1700;
     const Z_PERCENT = 12;
 
     async function loadShift() {
@@ -252,28 +260,33 @@
     }
 
     function updateResult() {
-    const income = parseFloat(document.getElementById('shiftIncome')?.textContent) || 0;
-    const commission = parseFloat(document.getElementById('shiftCommission')?.textContent) || 0;
-    const z = parseFloat(document.getElementById('zReportMdl').value) || 0;
-    const fuel = parseFloat(document.getElementById('fuelLei').value) || 0;
-    const plan = parseFloat(document.getElementById('planMdl').value) || 0;
+        const income = parseFloat(document.getElementById('shiftIncome')?.textContent) || 0;
+        const commission = parseFloat(document.getElementById('shiftCommission')?.textContent) || 0;
+        const z = parseFloat(document.getElementById('zReportMdl').value) || 0;
+        const fuel = parseFloat(document.getElementById('fuelLei').value) || 0;
+        const plan = parseFloat(document.getElementById('planMdl').value) || 0;
 
-    // Если план = 0, то и лимит = 0
-    const limit = plan > 0 ? Z_LIMIT : 0;
-    let zPercent = 0;
-    if (z > limit) {
-        zPercent = (z - limit) * Z_PERCENT / 100;
+        const limit = plan > 0 ? Z_LIMIT : 0;
+        let zPercent = 0;
+        if (z > limit) {
+            zPercent = (z - limit) * Z_PERCENT / 100;
+        }
+
+        const totalExpenses = Math.abs(commission) + zPercent + fuel + plan;
+        const net = income - totalExpenses;
+
+        document.getElementById('resultIncome').textContent = income.toFixed(2) + ' MDL';
+        document.getElementById('resultZ').textContent = z.toFixed(2) + ' MDL';
+        document.getElementById('resultZPercent').textContent = zPercent.toFixed(2) + ' MDL';
+        document.getElementById('resultCommission').textContent = Math.abs(commission).toFixed(2) + ' MDL';
+        document.getElementById('resultFuel').textContent = fuel.toFixed(2) + ' MDL';
+        document.getElementById('resultPlan').textContent = plan.toFixed(2) + ' MDL';
+        document.getElementById('resultExpenses').textContent = totalExpenses.toFixed(2) + ' MDL';
+
+        const netEl = document.getElementById('resultNet');
+        netEl.textContent = net.toFixed(2) + ' MDL';
+        netEl.className = net >= 0 ? 'fs-5 text-success' : 'fs-5 text-danger';
     }
-
-    const net = income - Math.abs(commission) + z - zPercent - fuel;
-
-    document.getElementById('resultIncome').textContent = income.toFixed(2) + ' MDL';
-    document.getElementById('resultZ').textContent = z.toFixed(2) + ' MDL';
-    document.getElementById('resultZPercent').textContent = zPercent.toFixed(2) + ' MDL';
-    document.getElementById('resultDiff').textContent = (z - income).toFixed(2) + ' MDL';
-    document.getElementById('resultFuel').textContent = fuel.toFixed(2) + ' MDL';
-    document.getElementById('resultNet').textContent = net.toFixed(2) + ' MDL';
-}
 
     function showError(msg) {
         const el = document.getElementById('error');

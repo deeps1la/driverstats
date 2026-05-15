@@ -110,6 +110,17 @@ class Database:
             ).fetchone()
             return dict(row) if row else None
 
+    def delete_shift(self, shift_id):
+        """Удаляет смену и отвязывает заказы."""
+        with sqlite3.connect(self.db_path) as conn:
+            # Отвязываем заказы от смены (не удаляем их)
+            conn.execute("UPDATE orders SET shift_id = NULL WHERE shift_id = ?", (shift_id,))
+            # Удаляем смену
+            conn.execute("DELETE FROM shifts WHERE id = ?", (shift_id,))
+            # Удаляем бухгалтерию
+            conn.execute("DELETE FROM accounting WHERE shift_id = ?", (shift_id,))
+            conn.commit()
+
     def open_shift(self):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(

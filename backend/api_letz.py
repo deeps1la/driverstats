@@ -163,7 +163,26 @@ class LetzApi:
             headers=self.headers,
             timeout=30,
         )
-        return response.json()    
+        return response.json()
+    def report_device_hardware(self, device_model="MI_9T_Pro", screen_size="1080x2296", os_version="10.0"):
+        """Отправляет данные устройства — маскировка под приложение Letz."""
+        response = requests.get(
+            f"{self.base_url}/ReportDeviceHardware",
+            params={
+                "deviceScreenSize": screen_size,
+                "deviceModel": device_model,
+                "sessionId": self.session_id,
+                "deviceOSVersion": os_version,
+            },
+            headers={
+                "Host": "letz99.from-md.com",
+                "Connection": "Keep-Alive",
+                "Accept-Encoding": "gzip",
+                "User-Agent": "okhttp/4.12.0",
+            },
+            timeout=30,
+        )
+        return response.json()        
 
 class TaxiDb:
     """Работа с локальной базой taxi.db (улицы, города)."""

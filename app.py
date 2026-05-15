@@ -271,16 +271,91 @@ def api_order_detail(order_id):
 
 @app.route("/api/stats")
 def api_stats():
-    # Авторизация и загрузка транзакций (как раньше)
     auth = LetzAuth(access_token=get_access_token(), device_id=get_device_id())
     session_id = auth.login()
+
+    # Если авторизация не удалась — отдаём данные из локальной БД
     if not session_id:
-        return jsonify({"error": "Ошибка авторизации"}), 500
+        current = db.get_current_shift()
+        current_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0, "z_percent": 0}
+
+        if current:
+            cs = db.get_shift_stats(current["id"])
+            current_stats = {
+                "orders": cs["orders"],
+                "income": cs["income"],
+                "commission": cs["commission"],
+                "net_profit": cs["net_profit"],
+                "distance_km": cs["distance_km"],
+                "z_percent": cs.get("z_percent", 0),
+            }
+
+        # Ищем последнюю закрытую смену
+        prev_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0}
+        all_shifts = db.get_shifts(limit=50)
+        for s in all_shifts:
+            if s["closed_at"] is not None:
+                ps = db.get_shift_stats(s["id"])
+                prev_stats = {
+                    "orders": ps["orders"],
+                    "income": ps["income"],
+                    "commission": ps["commission"],
+                    "net_profit": ps["net_profit"],
+                    "distance_km": ps["distance_km"],
+                }
+                break
+
+        return jsonify({
+            "today": current_stats,
+            "yesterday": prev_stats,
+            "balance": 0,
+            "shift_open": current is not None,
+            "last_update": datetime.now().strftime("%d.%m.%Y %H:%M"),
+            "cached": True
+        })
+
+    # Авторизация успешна — работаем с Letz API
     api = LetzApi(session_id)
+
     try:
         transactions_data = api.fetch_all_transactions()
     except:
-        return jsonify({"error": "Ошибка API"}), 500
+        # API не отвечает — отдаём БД
+        current = db.get_current_shift()
+        current_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0, "z_percent": 0}
+        if current:
+            cs = db.get_shift_stats(current["id"])
+            current_stats = {
+                "orders": cs["orders"],
+                "income": cs["income"],
+                "commission": cs["commission"],
+                "net_profit": cs["net_profit"],
+                "distance_km": cs["distance_km"],
+                "z_percent": cs.get("z_percent", 0),
+            }
+
+        prev_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0}
+        all_shifts = db.get_shifts(limit=50)
+        for s in all_shifts:
+            if s["closed_at"] is not None:
+                ps = db.get_shift_stats(s["id"])
+                prev_stats = {
+                    "orders": ps["orders"],
+                    "income": ps["income"],
+                    "commission": ps["commission"],
+                    "net_profit": ps["net_profit"],
+                    "distance_km": ps["distance_km"],
+                }
+                break
+
+        return jsonify({
+            "today": current_stats,
+            "yesterday": prev_stats,
+            "balance": 0,
+            "shift_open": current is not None,
+            "last_update": datetime.now().strftime("%d.%m.%Y %H:%M"),
+            "cached": True
+        })
 
     balance = transactions_data.get("CurrentBalance", 0)
 
@@ -332,9 +407,9 @@ def api_stats():
         except Exception as e:
             print(f"  ⚠️ Ошибка заказа #{tx['Id']}: {e}")
 
-    # Статистика: текущая смена vs прошлая смена
+    # Статистика: текущая смена vs прошлая
     current = db.get_current_shift()
-    current_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0}
+    current_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0, "z_percent": 0}
 
     if current:
         cs = db.get_shift_stats(current["id"])
@@ -344,9 +419,9 @@ def api_stats():
             "commission": cs["commission"],
             "net_profit": cs["net_profit"],
             "distance_km": cs["distance_km"],
+            "z_percent": cs.get("z_percent", 0),
         }
 
-    # Прошлая закрытая смена
     prev_stats = {"orders": 0, "income": 0, "commission": 0, "net_profit": 0, "distance_km": 0}
     all_shifts = db.get_shifts(limit=50)
     for s in all_shifts:
@@ -368,7 +443,6 @@ def api_stats():
         "shift_open": current is not None,
         "last_update": datetime.now().strftime("%d.%m.%Y %H:%M"),
     })
-
 
 # ----------------------------------------------------------
 # Отчёты
@@ -518,7 +592,15 @@ def api_shift_detail(shift_id):
             o["address"] = "—"
 
     return jsonify(shift)
-    
+
+@app.route("/api/shift/<int:shift_id>/delete", methods=["POST"])
+def api_delete_shift(shift_id):
+    shift = db.get_shift(shift_id)
+    if not shift:
+        return jsonify({"error": "Смена не найдена"}), 404
+    db.delete_shift(shift_id)
+    return jsonify({"ok": True})
+
 #-----------------------------------------------------------
 # Баланс QR
 #-----------------------------------------------------------
