@@ -277,7 +277,6 @@ def api_order_detail(order_id):
 # ----------------------------------------------------------
 
 @app.route("/api/stats")
-@app.route("/api/stats")
 def api_stats():
     # Пробуем авторизоваться
     auth = LetzAuth(access_token=get_access_token(), device_id=get_device_id())
@@ -309,7 +308,7 @@ def api_stats():
                 "income": cs["income"],
                 "commission": cs["commission"],
                 "net_profit": cs["net_profit"],
-                "distance_km": cs["distance_km"],
+                "distance_km": 0,
                 "z_percent": cs.get("z_percent", 0),
             }
 
@@ -352,7 +351,7 @@ def api_stats():
                 "income": cs["income"],
                 "commission": cs["commission"],
                 "net_profit": cs["net_profit"],
-                "distance_km": cs["distance_km"],
+                "distance_km": current.get("total_km", 0),
                 "z_percent": cs.get("z_percent", 0),
             }
 
