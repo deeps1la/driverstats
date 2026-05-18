@@ -140,11 +140,6 @@ function renderStats(data) {
     compare('commission', t.commission, y.commission, 'MDL');
     compare('netProfit', t.net_profit, y.net_profit, 'MDL');
 
-    const percentZ = t.z_percent ? t.z_percent.toFixed(2) : '0.00';
-    document.getElementById('percentZ').textContent = percentZ + ' MDL';
-    document.getElementById('plan').textContent = '0 MDL';
-    document.getElementById('fuel').textContent = '0 MDL';
-
     document.getElementById('lastUpdate').textContent = 'Последнее обновление: ' + (data.last_update || 'сейчас');
     document.getElementById('content').classList.remove('d-none');
 }
@@ -164,3 +159,19 @@ document.addEventListener('DOMContentLoaded', function() {
     loadQrBalance().catch(function() {});
     loadStats().catch(function() {});
 });
+
+// Тёмная тема
+function toggleTheme() {
+    const isDark = document.getElementById('themeToggle').checked;
+    document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+}
+
+// При загрузке страницы — применить сохранённую тему
+(function() {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark') {
+        document.documentElement.setAttribute('data-bs-theme', 'dark');
+        document.getElementById('themeToggle').checked = true;
+    }
+})();

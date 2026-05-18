@@ -152,3 +152,75 @@ body {
 .step-icon { font-size: 18px; width: 24px; text-align: center; }
 .step-done .step-icon { color: #4CAF50; }
 .step-active .step-icon { color: #2196F3; }
+
+/* ============================================================
+   ТЁМНАЯ ТЕМА
+   ============================================================ */
+
+   [data-bs-theme="dark"] {
+    --bs-body-bg: #1a1a2e;
+    --bs-body-color: #e0e0e0;
+}
+
+[data-bs-theme="dark"] .card {
+    background: #16213e;
+    border-color: #0f3460;
+}
+
+[data-bs-theme="dark"] .card .text-muted {
+    color: #a0a0b0 !important;
+}
+
+[data-bs-theme="dark"] .app-header {
+    background: linear-gradient(135deg, #0f3460, #16213e, #1a1a2e);
+}
+
+[data-bs-theme="dark"] .bg-light {
+    background-color: #1a1a2e !important;
+}
+
+[data-bs-theme="dark"] .offcanvas {
+    background: #16213e;
+    color: #e0e0e0;
+}
+
+[data-bs-theme="dark"] .shift-card:hover {
+    background: #1a1a3e !important;
+}
+
+[data-bs-theme="dark"] .detail-block {
+    background: #1a1a3e;
+}
+
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+    background: #16213e;
+    border-color: #0f3460;
+    color: #e0e0e0;
+}
+
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+    background: #1a1a3e;
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .btn-outline-light {
+    border-color: rgba(255,255,255,0.2);
+}
+
+[data-bs-theme="dark"] .text-dark {
+    color: #e0e0e0 !important;
+}
+
+[data-bs-theme="dark"] .alert-success {
+    background: #0d3320;
+    border-color: #14633e;
+    color: #8fffb8;
+}
+
+[data-bs-theme="dark"] .alert-danger {
+    background: #331111;
+    border-color: #631414;
+    color: #ffaaaa;
+}
